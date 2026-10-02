@@ -9,7 +9,7 @@ Bu proje mevcut PHP/HTML siteye uygundur. PHP 8.2 veya üstü, PDO MySQL, mbstri
 
 Hostinger → ilgili web sitesi → Gelişmiş → GIT.
 Depo URL'si: `https://github.com/hipokrat-dev/homedojo.git`, dal: `main`.
-Mevcut başka uygulamaları değiştirmeyin. Hedef dizin boş olmalıdır; varsayılan Hostinger başlangıç dosyası varsa önce yedek klasöre taşıyın. Deploy sonrasında `app`, `public` ve kök `.htaccess` bulunmalıdır. GitHub otomatik deploy webhook'u panel üzerinden açılabilir; bu ilk sürümde otomatik yayınlama ayrıca etkinleştirilmiş sayılmaz.
+Mevcut başka uygulamaları değiştirmeyin. Hedef dizin boş olmalıdır; varsayılan Hostinger başlangıç dosyası varsa önce yedek klasöre taşıyın. Deploy sonrasında `app`, `public` ve kök `.htaccess` bulunmalıdır. Hostinger'ın GitHub bağlantısında Otomatik Dağıtım açıktır. `main` dalına gönderilen her commit (doğrudan push veya birleştirilen pull request) bu siteye otomatik dağıtılır; ayrıca Deploy düğmesine basmak gerekmez.
 
 ## 2. Veritabanı
 
@@ -41,3 +41,16 @@ Kurulumdan sonra `public_html` dışında `homedojo-private/config.local.php` ol
 Hostinger'da Deploy işlemi kaynak dosyaları günceller. Üretim yapılandırması public_html dışında homedojo-private/config.local.php içinde tutulur ve kaynak dağıtımına dahil edilmez. Kurulum anahtarı tek kullanımlıktır. Veritabanı kaynak dağıtımından bağımsızdır. Yayınlamadan önce veritabanı yedeği alın. Hata durumunda PHP hata günlüğünü inceleyin; ayrıntılı SQL/parola hataları ziyaretçilere gösterilmez.
 
 Ev şifresini sıfırlamak gerekirse site sahibi güvenli bir ortamda `password_hash` oluşturup `homedojo-private/config.local.php` içindeki hash'i değiştirebilir. PHP oturumları da temizlenerek açık oturumlar sonlandırılmalıdır.
+
+## Otomatik dağıtım akışı
+
+1. Değişikliği yerelde hazırlayın; PHP/JavaScript kontrollerini ve ilgili testleri çalıştırın.
+2. Kodu `hipokrat-dev/homedojo` deposunun `main` dalına gönderin. Başka bir dal kullanıyorsanız önce `main` dalına birleştirin.
+3. Hostinger'ın yerleşik GitHub entegrasyonu değişikliği algılar ve `public_html` dizinine dağıtır. İlave GitHub parolası, SSH anahtarı veya depo içinde deploy sırrı gerekmez.
+4. Hostinger → Dağıtımlar ekranında ilgili commit'in **Tamamlandı** durumunu kontrol edin. Hata olursa dağıtım ayrıntılarından günlükleri inceleyin.
+
+GitHub Actions testleri ayrı çalışır; Hostinger'ın doğrudan otomatik dağıtımı Actions sonucunu beklemez. `main` dalına yalnızca kontrolleri tamamlanan değişiklikleri gönderin.
+
+HTML, CSS ve JavaScript yanıtları `Cache-Control: no-cache` ile tekrar doğrulanır; yeni dağıtımdan sonra sayfa yenilendiğinde dosyaların güncel sürümü istenir. Zaten açık bir sayfa kendiliğinden yenilenmez.
+
+Görevler, puanlar ve ödüller MySQL'de; üretim bağlantısı `public_html` dışında `homedojo-private/config.local.php` içindedir. Kaynak dağıtımı bunları sıfırlamaz. Kurulum işlemi yalnızca ilk açılışta yapılır; güncellemelerde yeniden kurulum veya seed/reset çalıştırmayın.

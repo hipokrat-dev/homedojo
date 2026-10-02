@@ -49,6 +49,12 @@ Ayrıntılar: [docs/HOSTINGER.md](docs/HOSTINGER.md).
 
 İlk kurulumdan sonra dört profilin adı Ayarlar ekranından değiştirilebilir. Yeni kurulumda altı örnek görev ve dört örnek ödül bulunur; tüm puanlar sıfırdan başlar. Test verileri yayına taşınmaz.
 
+## Otomatik yayınlama
+
+Hostinger, GitHub'daki `main` dalını izler. Bu dala gönderilen veya birleştirilen her commit otomatik olarak dağıtılır. Yerel dosyayı değiştirmek tek başına yayın başlatmaz; değişikliğin GitHub'a gönderilmesi gerekir. GitHub Actions kontrolleri bağımsızdır ve otomatik dağıtımı durdurmaz.
+
+Üretim veritabanı yapılandırması web kökü dışında korunur; yeni sürümler görev, puan veya ödül verilerini sıfırlamaz. Ayrıntılar [yayınlama rehberinde](docs/HOSTINGER.md).
+
 ## Veri ve yedekleme
 
 `homedojo_state` tablosundaki tek JSON belge bu küçük dört kişilik uygulamanın verilerini tutar. Her yazmada InnoDB satırı kilitlenir. Bu tasarım küçük aile kullanımı içindir; yüksek hacimli çok haneli kullanım için normalleştirilmiş şema gerekir. Oturumlar PHP oturum deposunda, giriş deneme sınırları `homedojo_login_limits` tablosundadır. Hostinger'ın günlük veritabanı yedeklerini etkin tutun. Güncellemeler mevcut verileri sıfırlamaz.
