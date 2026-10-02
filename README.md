@@ -31,6 +31,7 @@ APP_ENV=development php -S localhost:3000 -t public
 php tests/domain.php
 php tests/store.php
 node --check public/app.js
+node tests/http.mjs
 find app public tests -name '*.php' -exec php -l {} \;
 ```
 
