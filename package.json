@@ -1,0 +1,5 @@
+{
+  "name": "homedojo", "version": "1.0.0", "private": true, "type": "module",
+  "description": "Dört kişilik ev ekibi için PHP + MySQL görev, puan ve ödül uygulaması",
+  "scripts": { "dev": "APP_ENV=development php -S localhost:3000 -t public", "check": "node --check public/app.js", "test": "php tests/domain.php && php tests/store.php" }
+}

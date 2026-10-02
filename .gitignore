@@ -1,0 +1,8 @@
+node_modules/
+.env
+data/
+app/config.local.php
+app/setup-key.php
+*.sqlite*
+test-results/
+.DS_Store

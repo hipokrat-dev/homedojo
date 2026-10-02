@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "users": [
+    {
+      "id": "u1",
+      "name": "Oyuncu 1",
+      "avatar": "🌻"
+    },
+    {
+      "id": "u2",
+      "name": "Oyuncu 2",
+      "avatar": "🦊"
+    },
+    {
+      "id": "u3",
+      "name": "Oyuncu 3",
+      "avatar": "🐼"
+    },
+    {
+      "id": "u4",
+      "name": "Oyuncu 4",
+      "avatar": "🐸"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "title": "Yatağını topla",
+      "description": "Güne küçük bir zaferle başla.",
+      "points": 20,
+      "frequency": "daily",
+      "icon": "🛏️"
+    },
+    {
+      "id": "t2",
+      "title": "20 dakika kitap oku",
+      "description": "Yeni bir hikâyeye yer aç.",
+      "points": 30,
+      "frequency": "daily",
+      "icon": "📚"
+    },
+    {
+      "id": "t3",
+      "title": "Bitkileri sula",
+      "description": "Yeşil dostlarına biraz ilgi.",
+      "points": 15,
+      "frequency": "daily",
+      "icon": "🌱"
+    },
+    {
+      "id": "t4",
+      "title": "Odanı düzenle",
+      "description": "Daha ferah bir alan, daha iyi bir his.",
+      "points": 60,
+      "frequency": "weekly",
+      "icon": "🧹"
+    },
+    {
+      "id": "t5",
+      "title": "Birlikte yemek hazırla",
+      "description": "Mutfağın bugünkü yıldızı sensin.",
+      "points": 80,
+      "frequency": "weekly",
+      "icon": "🍳"
+    },
+    {
+      "id": "t6",
+      "title": "Kullanmadıklarını bağışla",
+      "description": "Paylaşınca güzelleşir.",
+      "points": 150,
+      "frequency": "monthly",
+      "icon": "📦"
+    }
+  ],
+  "rewards": [
+    {
+      "id": "r1",
+      "title": "Film gecesi",
+      "description": "Filmi sen seç, patlamış mısır bizden.",
+      "cost": 100,
+      "icon": "🍿"
+    },
+    {
+      "id": "r2",
+      "title": "Dondurma molası",
+      "description": "En sevdiğin lezzete küçük bir kaçamak.",
+      "cost": 200,
+      "icon": "🍦"
+    },
+    {
+      "id": "r3",
+      "title": "Oyun zamanı",
+      "description": "Birlikte oynanacak ekstra 30 dakika.",
+      "cost": 300,
+      "icon": "🎮"
+    },
+    {
+      "id": "r4",
+      "title": "Hafta sonu macerası",
+      "description": "Bir sonraki aile gezisinin rotasını seç.",
+      "cost": 600,
+      "icon": "🚀"
+    }
+  ],
+  "completions": [],
+  "redemptions": []
+}
