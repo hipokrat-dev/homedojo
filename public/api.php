@@ -7,7 +7,7 @@ try{
     $development=($config['environment']??'production')==='development';
     if(!$development&&empty($config['password_hash']))throw new RuntimeException('Password is required in production.');
     $authenticated=$development&&!$config['password_hash']||(!empty($_SESSION['authenticated'])&&($_SESSION['expires']??0)>time());
-    $writes=['login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','complete','redeem'];
+    $writes=['login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem'];
     if(in_array($action,$writes,true)){
         if($method!=='POST')throw new AppError('Bu işlem POST gerektirir.',405);
         if(($_SERVER['HTTP_SEC_FETCH_SITE']??'')==='cross-site')throw new AppError('Bu kaynaktan işlem yapılamaz.',403);
@@ -32,6 +32,10 @@ try{
     }
     $csrf=$_SESSION['csrf'];session_write_close();
     if($action==='state')json_response(['state'=>snapshot($store->read()),'csrf'=>$csrf]);
-    if($action==='spin'){if(!is_string($input['userId']??null))throw new AppError('Kullanıcı geçersiz.');json_response(spin($store->read(),$input['userId']));}
+    if($action==='spin'){
+        $userId=valid_text($input['userId']??null,'Kullanıcı',64);$frequency=valid_text($input['frequency']??'all','Dönem',10);$requestId=valid_request($input['requestId']??null);
+        $result=[];$state=$store->update(function(array &$state)use($userId,$frequency,$requestId,&$result){$result=spin($state,$userId,$frequency,$requestId);});
+        json_response($result+['state'=>snapshot($state)]);
+    }
     $state=$store->update(function(array &$state)use($action,$input){mutate($state,$action,$input);});json_response(['state'=>snapshot($state)]);
 }catch(AppError $e){json_response(['error'=>$e->getMessage()],$e->status);}catch(Throwable $e){error_log('HomeDojo: '.$e->getMessage());json_response(['error'=>'Sunucu bağlantısı tamamlanamadı. Lütfen daha sonra tekrar dene.'],500);}

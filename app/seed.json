@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "users": [
     {
       "id": "u1",
@@ -70,6 +70,38 @@
       "points": 150,
       "frequency": "monthly",
       "icon": "📦"
+    },
+    {
+      "id": "t7",
+      "title": "Ödevini tamamla",
+      "description": "Bugünün okul görevlerine odaklan.",
+      "points": 40,
+      "frequency": "daily",
+      "icon": "✏️"
+    },
+    {
+      "id": "t8",
+      "title": "Oyuncakları düzenle",
+      "description": "Oyun alanını birlikte toparlayalım.",
+      "points": 25,
+      "frequency": "daily",
+      "icon": "🧸"
+    },
+    {
+      "id": "t9",
+      "title": "Bir doğa yürüyüşü yap",
+      "description": "Ailenle birlikte açık havayı keşfet.",
+      "points": 70,
+      "frequency": "weekly",
+      "icon": "🥾"
+    },
+    {
+      "id": "t10",
+      "title": "Bir proje hazırla",
+      "description": "Merak ettiğin bir konuyu araştır ve paylaş.",
+      "points": 200,
+      "frequency": "monthly",
+      "icon": "🔬"
     }
   ],
   "rewards": [
@@ -103,5 +135,6 @@
     }
   ],
   "completions": [],
-  "redemptions": []
+  "redemptions": [],
+  "assignments": []
 }

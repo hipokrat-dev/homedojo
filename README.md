@@ -7,7 +7,11 @@ Dört kişilik ev ekibi için Türkçe, mobil uyumlu görev ve ödül uygulamas�
 - Ana sayfada dört düzenlenebilir profil, ayrı bakiye ve toplam puan/seviye göstergesi.
 - Görev ekleme, düzenleme, silme; görev başına ayrı puan.
 - Türkiye saatine göre günlük, pazartesi yenilenen haftalık ve ayın ilk günü yenilenen aylık görevler.
-- Tamamlanmamış görevler arasından sunucuda rastgele seçim yapan animasyonlu çark. Çevirme puan kazandırmaz; görevi tamamlamak kazandırır.
+- Önce hedef ödül seçimi; görev adları ve puanlarını gösteren, günlük/haftalık/aylık filtreli animasyonlu çark. Sunucudaki rastgele seçim görevi, puanını ve son tarihini kalıcı olarak atar.
+- Ana sayfada atanmış görevler, geri sayım ve hedef ödül ilerlemesi. Çevirme puan kazandırmaz; zamanında tamamlamak kazandırır.
+- Günlük görev o günün sonunda, haftalık görev pazartesi 00:00, aylık görev sonraki ayın 1’i 00:00 Türkiye saatinde sona erer. Son tarihe eşit veya sonraki tamamlama isteği sunucuda reddedilir; süresi dolan kayıt geçmişte sıfır puanla görünür.
+- Atanmış görevin başlığı, puanı ve süresi sabitlenir; görev havuzunu sonradan düzenlemek bu atamayı değiştirmez. Aynı görev aynı profile bir dönemde yalnızca bir kez atanır.
+- Açık sayfa 15 saniyede bir güncellenir; profil hedefi, atamalar, kazanımlar ve ödül geçmişi veritabanında tutulur.
 - Düzenlenebilir ödüller; yeterli bakiye ile alma, puanı düşme ve geçmiş kaydı.
 - Görev/ödül değişiklikleri geçmiş puan kayıtlarını değiştirmez.
 - MySQL InnoDB satır kilidi ile atomik puan işlemleri, tekrar tamamlama koruması ve ödül isteği tekrar koruması.
@@ -47,7 +51,7 @@ Ayrıntılar: [docs/HOSTINGER.md](docs/HOSTINGER.md).
 4. Kurulum ekranında MySQL bilgilerini, HTTPS site adresini ve en az 12 karakter ortak ev şifresini girin.
 5. Kurulum tabloları oluşturur, şifreyi hash olarak saklar, anahtarı siler ve kendisini kilitler. Yapılandırma public_html dışında homedojo-private/config.local.php dosyasında tutulur.
 
-İlk kurulumdan sonra dört profilin adı Ayarlar ekranından değiştirilebilir. Yeni kurulumda altı örnek görev ve dört örnek ödül bulunur; tüm puanlar sıfırdan başlar. Test verileri yayına taşınmaz.
+İlk kurulumdan sonra dört profilin adı Ayarlar ekranından değiştirilebilir. Yeni kurulumda on örnek görev ve dört örnek ödül bulunur; tüm puanlar sıfırdan başlar. Test verileri yayına taşınmaz.
 
 ## Otomatik yayınlama
 
@@ -58,3 +62,7 @@ Hostinger, GitHub'daki `main` dalını izler. Bu dala gönderilen veya birleşti
 ## Veri ve yedekleme
 
 `homedojo_state` tablosundaki tek JSON belge bu küçük dört kişilik uygulamanın verilerini tutar. Her yazmada InnoDB satırı kilitlenir. Bu tasarım küçük aile kullanımı içindir; yüksek hacimli çok haneli kullanım için normalleştirilmiş şema gerekir. Oturumlar PHP oturum deposunda, giriş deneme sınırları `homedojo_login_limits` tablosundadır. Hostinger'ın günlük veritabanı yedeklerini etkin tutun. Güncellemeler mevcut verileri sıfırlamaz.
+
+### Sürüm 2 veri geçişi
+
+Mevcut JSON kaydına `assignments` alanı eklenir; eski profiller, görevler, puanlar ve ödül geçmişi korunur. On örnek görev yalnızca yeni kurulumda oluşturulur. Süre aşımı sunucu saatinden hesaplandığı için ayrıca cron işi gerekmez. Eski tamamlamalar geçerli dönem içinde yeniden görev seçimini engeller.
