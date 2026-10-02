@@ -45,7 +45,7 @@ Ayrıntılar: [docs/HOSTINGER.md](docs/HOSTINGER.md).
 2. Bu uygulamaya özel MySQL veritabanı ve kullanıcısı oluşturun.
 3. Güvenli tek kullanımlık kurulum bağlantısı için `app/setup-key.php` dosyasını yalnızca sunucuda oluşturun. Anahtarı veya gerçek yapılandırmayı GitHub'a göndermeyin.
 4. Kurulum ekranında MySQL bilgilerini, HTTPS site adresini ve en az 12 karakter ortak ev şifresini girin.
-5. Kurulum tabloları oluşturur, şifreyi hash olarak saklar, anahtarı siler ve kendisini kilitler.
+5. Kurulum tabloları oluşturur, şifreyi hash olarak saklar, anahtarı siler ve kendisini kilitler. Yapılandırma public_html dışında homedojo-private/config.local.php dosyasında tutulur.
 
 İlk kurulumdan sonra dört profilin adı Ayarlar ekranından değiştirilebilir. Yeni kurulumda altı örnek görev ve dört örnek ödül bulunur; tüm puanlar sıfırdan başlar. Test verileri yayına taşınmaz.
 

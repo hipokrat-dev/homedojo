@@ -25,7 +25,7 @@ php -r '$key=bin2hex(random_bytes(32)); file_put_contents("app/setup-key.php", "
 
 Yalnızca `app/setup-key.php` dosyasını Hostinger Dosya Yöneticisi ile sunucudaki aynı konuma yükleyin. Bu dosya `.gitignore` ile dışlanır. Anahtarı kimseyle paylaşmayın.
 `https://SITE-ADRESI/setup.php?key=ANAHTAR` bağlantısını açın. İlk ziyarette anahtar URL'den çıkarılır ve yetki kısa ömürlü PHP oturumuna alınır. Veritabanı bağlantısını ve ev şifresini site sahibi girmelidir.
-Kurulumdan sonra `app/config.local.php` oluşur, setup anahtarı silinir ve kurulum kapanır. Ev şifresi düz metin olarak saklanmaz. Veritabanı parolası yalnızca PHP yapılandırmasında kalır; app dizini dışarıya kapalıdır.
+Kurulumdan sonra `public_html` dışında `homedojo-private/config.local.php` oluşur, setup anahtarı silinir ve kurulum kapanır. Ev şifresi düz metin olarak saklanmaz. Veritabanı parolası yalnızca web kökü dışındaki PHP yapılandırmasında kalır; app dizini de dışarıya kapalıdır.
 
 ## 4. Yayın kontrolü
 
@@ -38,6 +38,6 @@ Kurulumdan sonra `app/config.local.php` oluşur, setup anahtarı silinir ve kuru
 
 ## Güncelleme ve kurtarma
 
-Hostinger'da Deploy işlemi kaynak dosyaları günceller. config.local.php, setup-key.php ve veritabanı Git'te olmadığı için korunur. Yayınlamadan önce veritabanı yedeği alın. Hata durumunda PHP hata günlüğünü inceleyin; ayrıntılı SQL/parola hataları ziyaretçilere gösterilmez.
+Hostinger'da Deploy işlemi kaynak dosyaları günceller. Üretim yapılandırması public_html dışında homedojo-private/config.local.php içinde tutulur ve kaynak dağıtımına dahil edilmez. Kurulum anahtarı tek kullanımlıktır. Veritabanı kaynak dağıtımından bağımsızdır. Yayınlamadan önce veritabanı yedeği alın. Hata durumunda PHP hata günlüğünü inceleyin; ayrıntılı SQL/parola hataları ziyaretçilere gösterilmez.
 
-Ev şifresini sıfırlamak gerekirse site sahibi güvenli bir ortamda `password_hash` oluşturup `config.local.php` içindeki hash'i değiştirebilir. PHP oturumları da temizlenerek açık oturumlar sonlandırılmalıdır.
+Ev şifresini sıfırlamak gerekirse site sahibi güvenli bir ortamda `password_hash` oluşturup `homedojo-private/config.local.php` içindeki hash'i değiştirebilir. PHP oturumları da temizlenerek açık oturumlar sonlandırılmalıdır.

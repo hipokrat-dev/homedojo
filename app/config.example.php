@@ -1,5 +1,5 @@
 <?php
-// Copy to config.local.php ONLY on your host. Never commit credentials.
+// Production: save as ../homedojo-private/config.local.php outside public_html. Never commit credentials.
 return [
     'environment'=>'production', 'driver'=>'mysql',
     'host'=>'localhost', 'port'=>3306,

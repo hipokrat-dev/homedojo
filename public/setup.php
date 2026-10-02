@@ -3,7 +3,7 @@ declare(strict_types=1);
 header('Cache-Control: no-store');header('Referrer-Policy: no-referrer');header('X-Frame-Options: DENY');
 require_once __DIR__.'/../app/bootstrap.php';
 session_start_safe();
-$configPath=__DIR__.'/../app/config.local.php';$keyPath=__DIR__.'/../app/setup-key.php';
+$configPath=private_config_path();$keyPath=__DIR__.'/../app/setup-key.php';
 if(is_file($configPath)){http_response_code(403);exit('Kurulum tamamlandı. Ana sayfadan giriş yapabilirsiniz.');}
 if(!is_file($keyPath)){http_response_code(403);exit('Kurulum kilitli. Site sahibi app/setup-key.php dosyasını oluşturmalı.');}
 $expected=require $keyPath;
@@ -20,6 +20,7 @@ try{
     $config=['environment'=>'production','driver'=>'mysql','host'=>valid_text($_POST['host']??'','Sunucu',120),'port'=>3306,'database'=>valid_text($_POST['database']??'','Veritabanı',100),'username'=>valid_text($_POST['username']??'','Kullanıcı',100),'password'=>valid_text($_POST['db_password']??'','Veritabanı şifresi',1024),'password_hash'=>password_hash($password,PASSWORD_DEFAULT),'public_url'=>$url];
     // A fresh connection verifies credentials before any config is saved.
     $store=new Store($config);$store->initialize();
+    if(!is_dir(dirname($configPath))&&!mkdir(dirname($configPath),0700,true))throw new RuntimeException('Private configuration directory cannot be created.');
     $handle=fopen($configPath,'x');if(!$handle)throw new AppError('Kurulum başka bir oturumda tamamlandı.',409);
     $configText="<?php\nreturn ".var_export($config,true).";\n";
     if(fwrite($handle,$configText)!==strlen($configText)){fclose($handle);unlink($configPath);throw new RuntimeException('Configuration write failed.');}fclose($handle);chmod($configPath,0600);
