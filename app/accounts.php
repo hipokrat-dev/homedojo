@@ -18,18 +18,19 @@ function setup_accounts(array &$s,array $in): void {
         $i=find_index($s['users'],$row['id']??'','Profil');$id=$s['users'][$i]['id'];$username=valid_username($row['username']??null);
         if(isset($ids[$id])||isset($names[$username]))throw new AppError('Her profil ve kullanıcı adı yalnızca bir kez kullanılabilir.');
         $ids[$id]=true;$names[$username]=true;
-        $updated[$i]=array_merge($s['users'][$i],['name'=>$id===$admin?'Baba':valid_text($row['name']??null,'İsim',30),'username'=>$username,'passwordHash'=>password_hash(account_password($row['password']??null),PASSWORD_DEFAULT),'role'=>$id===$admin?'admin':'member','authVersion'=>1]);
+        $updated[$i]=array_merge($s['users'][$i],['name'=>$id===$admin?'Baba':valid_text($row['name']??null,'İsim',30),'username'=>$username,'passwordHash'=>password_hash(account_password($row['password']??null),PASSWORD_DEFAULT),'role'=>$id===$admin?'admin':'member','authVersion'=>1,'memberType'=>$id===$admin||mb_strtolower(trim($row['name']??''),'UTF-8')==='anne'?'parent':'child']);
     }
     ksort($updated);$s['users']=array_values($updated);$s['accountsEnabled']=true;
 }
 function actor_for(array $s,array $session): ?array {
     if(!accounts_ready($s)||($session['expires']??0)<=time())return null;
-    foreach($s['users'] as $u)if($u['id']===($session['userId']??null)&&($u['authVersion']??1)===($session['authVersion']??0))return $u;
+    foreach($s['users'] as $u)if(empty($u['archivedAt'])&&$u['id']===($session['userId']??null)&&($u['authVersion']??1)===($session['authVersion']??0))return $u;
     return null;
 }
 function authorize_action(array $s,array $actor,string $action,array &$in): void {
-    $admin=['saveTask','deleteTask','saveReward','deleteReward','saveUser','createCompetition','cancelCompetition','claimCompetition','saveAccount'];
+    $admin=['saveTask','deleteTask','saveReward','deleteReward','saveUser','createCompetition','cancelCompetition','claimCompetition','saveAccount','createAccount','archiveAccount','restoreAccount','saveRoutines'];
     if(in_array($action,$admin,true)&&($actor['role']??'member')!=='admin')throw new AppError('Bu işlem yalnızca admin hesabına açık.',403);
+    if(($actor['memberType']??'')==='young_child'&&in_array($action,['spin','selectGoal','complete','redeem','cancelAssignment','reviewAssignment'],true))throw new AppError('Küçük çocuk hesabında günlük görev ekranını kullan.',403);
     if(in_array($action,['spin','selectGoal','complete','redeem','cancelAssignment'],true)){
         if(isset($in['userId'])&&$in['userId']!==$actor['id'])throw new AppError('Yalnızca kendi hesabında işlem yapabilirsin.',403);
         $in['userId']=$actor['id'];
@@ -41,15 +42,58 @@ function member_snapshot(array $s,array $actor): array {
     $v['assignments']=array_values(array_filter($v['assignments'],fn($a)=>$a['userId']===$actor['id']||($a['reviewerId']??null)===$actor['id']));
     foreach(['completions','redemptions'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($a)=>$a['userId']===$actor['id']));
     if($actor['role']!=='admin')foreach(['tasks','rewards'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($r)=>$key==='tasks'?task_visible_to($r,$actor['id']):$r['ownerId']===$actor['id']));
+    $v['archivedUsers']=$actor['role']==='admin'?array_values(array_map(fn($u)=>array_intersect_key($u,array_flip(['id','name','username','avatar','memberType','archivedAt'])),array_filter($v['users'],fn($u)=>!empty($u['archivedAt'])))):[];
+    $v['users']=array_values(array_filter($v['users'],fn($u)=>empty($u['archivedAt'])));
+    foreach($v['users'] as &$u)if($actor['role']!=='admin'&&$u['id']!==$actor['id'])unset($u['routineSchedule'],$u['guardianId']);unset($u);
+    if(($actor['memberType']??'')==='young_child'){$v['dailyRoutines']=daily_routines($s,$actor);$v['guardianName']=routine_guardian($s,$actor)['name'];}
     return $v;
 }
 function save_account(array &$s,array $in): void {
-    $i=find_index($s['users'],$in['id']??null,'Kullanıcı');$username=valid_username($in['username']??null);
-    foreach($s['users'] as $j=>$u)if($j!==$i&&$u['username']===$username)throw new AppError('Bu kullanıcı adı kullanılıyor.');
-    $s['users'][$i]['username']=$username;
-    $s['users'][$i]['name']=valid_text($in['name']??null,'İsim',30);
-    $s['users'][$i]['avatar']=valid_text($in['avatar']??null,'Simge',12);
-    if(($in['password']??'')!==''){$s['users'][$i]['passwordHash']=password_hash(account_password($in['password']),PASSWORD_DEFAULT);$s['users'][$i]['authVersion']=($s['users'][$i]['authVersion']??1)+1;}
+    $i=active_user_index($s,$in['id']??null);$old=$s['users'][$i];$username=valid_username($in['username']??null);
+    foreach($s['users'] as $j=>$u)if($j!==$i&&($u['username']??'')===$username)throw new AppError('Bu kullanıcı adı kullanılıyor.');
+    $type=$in['memberType']??$old['memberType']??'child';
+    if(!in_array($type,['parent','child','young_child'],true))throw new AppError('Kullanıcı türü geçersiz.');
+    if(($old['role']??'')==='admin'&&$type!=='parent')throw new AppError('Admin hesabı ebeveyn olarak kalmalı.');
+    if($type!=='parent')foreach($s['users'] as $u)if(empty($u['archivedAt'])&&($u['guardianId']??'')===$old['id'])throw new AppError('Önce bu ebeveyne bağlı çocukların onaycısını değiştir.');
+    $updated=array_merge($old,['username'=>$username,'name'=>valid_text($in['name']??null,'İsim',30),'avatar'=>valid_text($in['avatar']??null,'Simge',12),'memberType'=>$type]);
+    if($type==='young_child'){
+        $guardian=$in['guardianId']??routine_guardian($s,$updated)['id'];$p=$s['users'][active_user_index($s,$guardian,'Ebeveyn')];
+        if($p['id']===$old['id']||($p['memberType']??'')!=='parent')throw new AppError('Başka bir ebeveyn seç.');
+        $updated['guardianId']=$guardian;$updated['routineSchedule'] ??= default_routines();
+    }else unset($updated['guardianId']);
+    if(($in['password']??'')!==''){$updated['passwordHash']=password_hash(account_password($in['password']),PASSWORD_DEFAULT);$updated['authVersion']=($old['authVersion']??1)+1;}
+    $s['users'][$i]=$updated;
+    // A newly selected guardian receives pending routine approvals too.
+    foreach($s['assignments'] as &$a)if($a['status']==='pending'){
+        if($a['userId']===$old['id']&&isset($a['routineId'])&&$type==='young_child')$a['reviewerId']=$updated['guardianId'];
+        elseif(($a['reviewerId']??'')===$old['id']&&$type==='young_child'){
+            $replacement=routine_guardian($s,$updated)['id'];
+            if($replacement===$a['userId']){$replacement=null;foreach($s['users'] as $p)if(empty($p['archivedAt'])&&$p['id']!==$a['userId']&&$p['memberType']!=='young_child'){$replacement=$p['id'];break;}}
+            if($replacement)$a['reviewerId']=$replacement;else{$a['status']='active';unset($a['reviewerId'],$a['submittedAt']);}
+        }
+    }unset($a);
+}
+function create_account(array &$s,array $in): void {
+    if(count($s['users'])>=100)throw new AppError('En fazla 100 kullanıcı kaydı tutulabilir.');
+    $id=uid();$candidate=$s;$candidate['users'][]=['id'=>$id,'name'=>'Yeni üye','avatar'=>'🌟','username'=>'','role'=>'member','authVersion'=>1,'memberType'=>'child'];
+    $in['id']=$id;account_password($in['password']??null);save_account($candidate,$in);$s=$candidate;
+}
+function archive_account(array &$s,array $actor,array $in): void {
+    $i=active_user_index($s,$in['id']??null);$u=$s['users'][$i];
+    if($u['id']===$actor['id']||($u['role']??'')==='admin')throw new AppError('Admin hesabı çıkarılamaz.',409);
+    $at=now_tr()->format(DateTimeInterface::ATOM);$s['users'][$i]['archivedAt']=$at;$s['users'][$i]['authVersion']=($u['authVersion']??1)+1;
+    foreach($s['users'] as &$child)if(($child['guardianId']??'')===$u['id'])$child['guardianId']=$actor['id'];unset($child);
+    foreach($s['assignments'] as &$a){
+        if($a['userId']===$u['id']&&in_array($a['status'],['active','pending'],true)){$a['status']='cancelled';$a['cancelledAt']=$at;}
+        elseif($a['status']==='pending'&&($a['reviewerId']??'')===$u['id']){
+            $replacement=null;foreach($s['users'] as $p)if(empty($p['archivedAt'])&&$p['id']!==$a['userId']&&$p['id']!==$u['id']&&($p['memberType']??'')!=='young_child'){$replacement=$p['id'];if(($p['role']??'')==='admin')break;}
+            if($replacement)$a['reviewerId']=$replacement;
+            else{$a['status']='active';unset($a['reviewerId'],$a['submittedAt']);}
+        }
+    }unset($a);
+}
+function restore_account(array &$s,array $in): void {
+    $i=find_index($s['users'],$in['id']??null,'Kullanıcı');if(empty($s['users'][$i]['archivedAt']))throw new AppError('Bu kullanıcı zaten aktif.',409);unset($s['users'][$i]['archivedAt']);$s['users'][$i]['authVersion']=($s['users'][$i]['authVersion']??1)+1;
 }
 
 function self_user_index(array $s,array $actor,array $in): int {

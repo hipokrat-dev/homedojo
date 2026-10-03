@@ -1,10 +1,10 @@
 # HomeDojo
 
-Dört kişilik ev ekibi için Türkçe, mobil uyumlu görev ve ödül uygulaması. PHP 8.2+ ve MySQL/MariaDB ile Hostinger Business üzerinde çalışır. Node.js sunucusu veya derleme gerekmez.
+Aile üyeleri için Türkçe, mobil uyumlu görev ve ödül uygulaması. PHP 8.2+ ve MySQL/MariaDB ile Hostinger Business üzerinde çalışır. Node.js sunucusu veya derleme gerekmez.
 
 ## Özellikler
 
-- Sade aile panosunda dört üyenin toplam ve kullanılabilir puanı; kişisel sayfada yalnızca kişinin hedefi ve görevleri.
+- Sade aile panosunda aktif üyelerin toplam ve kullanılabilir puanı; kişisel sayfada yalnızca kişinin hedefi ve görevleri.
 - Görev ekleme, düzenleme, silme; görev başına ayrı puan.
 - Atama anından başlayan süreler: 1 gün (24 saat), 1 hafta (7 gün), 1 ay (sonraki ayın aynı günü ve saati; o gün yoksa ayın son günü).
 - Önce hedef ödül seçimi; görev adları ve puanlarını gösteren, günlük/haftalık/aylık filtreli animasyonlu çark. Sunucudaki rastgele seçim görevi, puanını ve son tarihini kalıcı olarak atar.
@@ -37,6 +37,7 @@ php tests/store.php
 php tests/accounts.php
 php tests/personal-catalogs.php
 php tests/profile.php
+php tests/family.php
 node --check public/app.js
 node tests/http.mjs
 find app public tests -name '*.php' -exec php -l {} \;
@@ -64,7 +65,7 @@ Hostinger, GitHub'daki `main` dalını izler. Bu dala gönderilen veya birleşti
 
 ## Veri ve yedekleme
 
-`homedojo_state` tablosundaki tek JSON belge bu küçük dört kişilik uygulamanın verilerini tutar. Her yazmada InnoDB satırı kilitlenir. Bu tasarım küçük aile kullanımı içindir; yüksek hacimli çok haneli kullanım için normalleştirilmiş şema gerekir. Oturumlar PHP oturum deposunda, giriş deneme sınırları `homedojo_login_limits` tablosundadır. Hostinger'ın günlük veritabanı yedeklerini etkin tutun. Güncellemeler mevcut verileri sıfırlamaz.
+`homedojo_state` tablosundaki tek JSON belge bu küçük aile uygulamasının verilerini tutar. Her yazmada InnoDB satırı kilitlenir. Bu tasarım küçük aile kullanımı içindir; yüksek hacimli çok haneli kullanım için normalleştirilmiş şema gerekir. Oturumlar PHP oturum deposunda, giriş deneme sınırları `homedojo_login_limits` tablosundadır. Hostinger'ın günlük veritabanı yedeklerini etkin tutun. Güncellemeler mevcut verileri sıfırlamaz.
 
 ### Sürüm 2 veri geçişi
 
@@ -72,9 +73,9 @@ Mevcut JSON kaydına `assignments` alanı eklenir; eski profiller, görevler, pu
 
 ## Kişisel sayfalar ve aile yarışmaları
 
-Her profilin `#profile/u1` … `#profile/u4` adresinde kendi sayfası vardır. Yenilemede sayfa korunur; kişisel sayfa her zaman giriş yapan hesaba aittir. Aile panosu dört kişinin toplam kazanılan ve kullanılabilir puanını gösterir; sıralama toplam kazanımla yapılır. Diğer üyelerin özel görev/ödül geçmişi gönderilmez; yalnızca seçilen onaycı kendisine gelen görevi görür.
+Her profilin `#profile/u1` … `#profile/u4` adresinde kendi sayfası vardır. Yenilemede sayfa korunur; kişisel sayfa her zaman giriş yapan hesaba aittir. Aile panosu aktif üyelerin toplam kazanılan ve kullanılabilir puanını gösterir; sıralama toplam kazanımla yapılır. Diğer üyelerin özel görev/ödül geçmişi gönderilmez; yalnızca seçilen onaycı kendisine gelen görevi görür.
 
-Aile yarışması için ad, ortak büyük ödül, toplam hedef puan ve süre belirlenir. Dört profil otomatik katılır. Yarışma başlangıcından sonra tamamlanan görevler, yarışma son tarihinden önceyse ortak hedefe katkı sağlar. Önceden alınmış fakat yarışma sırasında tamamlanan görevler de sayılır; önceden kazanılmış puanlar sayılmaz. İptal/süre aşımı puan kazandırmaz. Bir seferde bir aktif yarışma başlatılır; katkı sıralaması, sonuç ve iptal kayıtları saklanır. Ortak ödül hedefe ulaşınca alındı olarak işaretlenebilir; kişisel puan bakiyeleri düşmez. Bu bir aile içi ödül kaydıdır, dışarıdan ürün satın alma işlemi değildir.
+Aile yarışması için ad, ortak büyük ödül, toplam hedef puan ve süre belirlenir. Yarışma başladığında aktif profiller otomatik katılır. Yarışma başlangıcından sonra tamamlanan görevler, yarışma son tarihinden önceyse ortak hedefe katkı sağlar. Önceden alınmış fakat yarışma sırasında tamamlanan görevler de sayılır; önceden kazanılmış puanlar sayılmaz. İptal/süre aşımı puan kazandırmaz. Bir seferde bir aktif yarışma başlatılır; katkı sıralaması, sonuç ve iptal kayıtları saklanır. Ortak ödül hedefe ulaşınca alındı olarak işaretlenebilir; kişisel puan bakiyeleri düşmez. Bu bir aile içi ödül kaydıdır, dışarıdan ürün satın alma işlemi değildir.
 
 Sürüm 3 geçişi `competitions` alanını ekler. Eski görev atamalarının mevcut son tarihleri korunur; yeni süre hesabı yeni atamalarda geçerlidir. Aktif yarışmanın süresi ve puan hedefi başlangıçta sabitlenir; gerekirse iptal edilip yeni yarışma başlatılır.
 
@@ -101,3 +102,12 @@ Admin görev formunda tek kişi yerine **Ortak görev** seçebilir; en az iki ka
 Her üye **Profil ayarları** ekranından fotoğraf ekleyebilir, değiştirebilir veya kaldırabilir. Tarayıcı 8 MB altındaki JPG/PNG/WebP görseli kırpıp küçültür; sunucu dosyayı doğrular ve 256×256 JPEG olarak yeniden kodlar. SVG ve bozuk dosyalar kabul edilmez, metadata tutulmaz. Fotoğraf JSON verisi içinde MySQL'de saklanır, dosya sistemine yüklenmez; otomatik dağıtımda korunur. PHP GD eklentisi gerekir.
 
 Kullanıcı adı veya şifre değişimi mevcut şifreyi gerektirir. Kullanıcı adları benzersizdir; yeni şifre tekrar doğrulanır. Başarılı değişimde oturum kimliği ve CSRF yenilenir; mevcut cihaz açık kalır, diğer cihazların oturumları bir sonraki istekte kapanır. Kullanıcı kendi rolünü veya başka bir hesabın bilgilerini değiştiremez. Başarısız doğrulamalar sınırlandırılır.
+
+
+## Kullanıcı yönetimi ve küçük çocuk günlük programı
+
+Admin paneli → Kullanıcılar üzerinden yeni hesap eklenir; her hesabın türü Ebeveyn, Çocuk veya Küçük çocuk olarak seçilir. Baba admin kalır; Ebeveyn türü seçmek admin yetkisi vermez. Çıkar işlemi hesabı arşivler, oturumlarını kapatır ve aile panosundan kaldırır. Puan/işlem geçmişi korunur. Çıkarılan kullanıcılar bölümünden geri eklenebilir; eski oturumlar yeniden açılmaz. Açık görevler iptal edilir, bekleyen onaylar uygun aktif üyeye aktarılır. Kullanıcı adları arşivdeyken de ayrılmış kalır.
+
+Küçük çocuk seçilince sekiz günlük görev içeren kişisel program ve onaycı ebeveyn belirlenir. Kullanıcı kartındaki Günlük program ekranından görev adı, simge, başlangıç, bitiş ve puan değiştirilebilir; görev eklenip kaldırılabilir. Saatler Europe/Istanbul'a göre her gün tekrar eder, cron gerekmez. Varsayılanlar: 07:00 yatak, 08:00 kahvaltı, 08:30 diş, 12:00 oyun, 18:00 oyuncaklar, 19:30 pijama, 20:00 diş, 20:30 yatak. Sabah görevleri 12:00, oyun 18:00, akşam görevleri 23:00'te kapanır. Her biri başlangıçta 10 puandır.
+
+Çocuk yalnızca günlük mektuplarını görür. Zarf açılınca renkli görev kartı çıkar; Yaptım seçili ebeveyne onay gönderir ve sıradaki uygun göreve geçer. Çark/ödül/onaylama işlemleri bu hesap türünde sunucuda da engellenir. Puan yalnızca ebeveyn onayıyla yazılır. Bitiş saatinden sonra gönderilemez; zamanında gönderilmiş görev daha sonra onaylanabilir. Çift tıklama tek kayıt oluşturur. Sonradan program düzenlemek gönderilmiş görevin puanını veya süresini değiştirmez. Hareket azaltma tercihi animasyonu kapatır. Mektup açma durumu yalnızca o sayfa oturumundadır; görev geçmişi veritabanında saklanır.

@@ -94,7 +94,26 @@ try{
  // A password reset invalidates previously authenticated sessions on the next request.
  assert.equal((await request('saveAccount',{id:'u2',username:'member2',name:'Anne',avatar:'🌷',password:'new-fixture-password'})).status,200);
  use(member);assert.equal((await request('state')).status,401);
+ // Membership lifecycle and young-child routes use the same authenticated, locked API.
+ use(other);assert.equal((await request('createAccount',{name:'Nope'})).status,403);
+ use(admin);const created=await request('createAccount',{name:'Minik',username:'little_test',password:'little-fixture-password',avatar:'🐣',memberType:'young_child',guardianId:'u1'});assert.equal(created.status,200);
+ const littleId=created.body.state.users.find(u=>u.username==='little_test').id;
+ assert.equal((await request('saveRoutines',{id:littleId,routines:[{id:'all-day',title:'Test routine',icon:'🌟',time:'00:00',until:'23:59',points:15}]})).status,200);
+ cookie='';csrf=(await request('session')).body.csrf;const childLogin=await request('login',{username:'little_test',password:'little-fixture-password'});assert.equal(childLogin.status,200);csrf=childLogin.body.csrf;const little={cookie,csrf};
+ const childState=(await request('state')).body.state;assert.equal(childState.dailyRoutines.length,1);assert.equal(childState.guardianName,'Baba');assert.ok(!JSON.stringify(childState).includes('passwordHash'));
+ assert.equal((await request('spin',{frequency:'daily',requestId:'child-block-spin-12345'})).status,403);
+ assert.equal((await request('createAccount',{})).status,403);
+ assert.equal((await request('archiveAccount',{id:'u1'})).status,403);
+ assert.equal((await request('completeRoutine',{routineId:'all-day',day:'2000-01-01'})).status,409);
+ if(childState.dailyRoutines[0].status==='active'){
+  const posted=await Promise.all([request('completeRoutine',{routineId:'all-day',day:childState.today}),request('completeRoutine',{routineId:'all-day',day:childState.today})]);assert.deepEqual(posted.map(r=>r.status),[200,200]);
+  const requests=posted[1].body.state.assignments.filter(a=>a.routineId==='all-day');assert.equal(requests.length,1);assert.equal(requests[0].status,'pending');
+  use(admin);const reviewed=await request('reviewAssignment',{assignmentId:requests[0].id,decision:'approve'});assert.equal(reviewed.status,200);assert.equal(reviewed.body.state.users.find(u=>u.id===littleId).earned,15);
+ }
+ use(admin);assert.equal((await request('archiveAccount',{id:littleId})).status,200);use(little);assert.equal((await request('state')).status,401);
+ cookie='';csrf=(await request('session')).body.csrf;assert.equal((await request('login',{username:'little_test',password:'little-fixture-password'})).status,422);
+ use(admin);const restored=await request('restoreAccount',{id:littleId});assert.equal(restored.status,200);assert.ok(restored.body.state.users.some(u=>u.id===littleId));assert.equal((await request('archiveAccount',{id:'u1'})).status,409);
  use(admin);assert.equal((await request('setupAccounts',{adminId:'u1',accounts})).status,409);
  assert.equal((await request('logout',{})).status,200);assert.equal((await request('state')).status,401);
  console.log('✓ HTTP personal login, migration, roles, ownership, privacy, CSRF, session rotation/revocation, concurrent draws/submissions/approvals, frozen points, reward debit and family scoring passed.');
-}finally{if(server){server.kill();await new Promise(r=>server.once('exit',r));}await rm(dir,{recursive:true,force:true});}
+}finally{if(server&&server.exitCode===null&&server.signalCode===null){const exited=new Promise(r=>server.once('exit',r));server.kill();await exited;}await rm(dir,{recursive:true,force:true});}

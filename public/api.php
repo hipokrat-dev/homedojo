@@ -7,7 +7,7 @@ try{
     $config=configuration();session_start_safe();$action=$_GET['action']??'state';$method=$_SERVER['REQUEST_METHOD'];
     $development=($config['environment']??'production')==='development';
     if(!$development&&empty($config['password_hash']))throw new RuntimeException('Password is required in production.');
-    $writes=['login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem','cancelAssignment','createCompetition','cancelCompetition','claimCompetition','setupAccounts','saveAccount','reviewAssignment','savePhoto','changeCredentials'];
+    $writes=['login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem','cancelAssignment','createCompetition','cancelCompetition','claimCompetition','setupAccounts','saveAccount','reviewAssignment','savePhoto','changeCredentials','createAccount','archiveAccount','restoreAccount','saveRoutines','completeRoutine'];
     if(in_array($action,$writes,true)){
         if($method!=='POST')throw new AppError('Bu işlem POST gerektirir.',405);
         if(($_SERVER['HTTP_SEC_FETCH_SITE']??'')==='cross-site')throw new AppError('Bu kaynaktan işlem yapılamaz.',403);
@@ -32,7 +32,7 @@ try{
             $store->clearLogin($ip);session_regenerate_id(true);$_SESSION['setupVerified']=true;$_SESSION['expires']=time()+1800;$_SESSION['csrf']=bin2hex(random_bytes(32));json_response(['csrf'=>$_SESSION['csrf'],'needsAccountSetup'=>true]);
         }
         $username=strtolower(is_string($input['username']??null)?$input['username']:'');$match=null;
-        foreach($current['users'] as $u)if(($u['username']??null)===$username)$match=$u;
+        foreach($current['users'] as $u)if(empty($u['archivedAt'])&&($u['username']??null)===$username)$match=$u;
         $hash=$match['passwordHash']??'$2y$10$Yx43vCh2BlMS9T9oeQrxAeSwRYN0Wo83ZmGvrAMYBYlAyKnlCV6rO';
         if(!is_string($password)||strlen($password)>72||!password_verify($password,$hash)||!$match)throw new AppError('Kullanıcı adı veya şifre doğru değil.',422);
         $store->clearLogin($ip);session_regenerate_id(true);$_SESSION=['userId'=>$match['id'],'authVersion'=>$match['authVersion'],'expires'=>time()+86400,'csrf'=>bin2hex(random_bytes(32))];json_response(['csrf'=>$_SESSION['csrf']]);
@@ -64,8 +64,14 @@ try{
         authorize_action($s,$actor,$action,$input);
         if($action==='spin')$result=spin($s,$actor['id'],valid_text($input['frequency']??'all','Dönem',10),valid_request($input['requestId']??null));
         elseif($action==='saveAccount')save_account($s,$input);
+        elseif($action==='createAccount')create_account($s,$input);
+        elseif($action==='archiveAccount')archive_account($s,$actor,$input);
+        elseif($action==='restoreAccount')restore_account($s,$input);
+        elseif($action==='saveRoutines')save_routines($s,$input);
+        elseif($action==='completeRoutine')complete_routine($s,$actor,$input);
         elseif($action==='savePhoto')save_photo($s,$actor,$input);
         else{$input['actorId']=$actor['id'];mutate($s,$action,$input);}
     });
-    json_response($result+['state'=>member_snapshot($current,$actor)]);
+    $updatedActor=$current['users'][find_index($current['users'],$actor['id'],'Kullanıcı')];
+    json_response($result+['state'=>member_snapshot($current,$updatedActor)]);
 }catch(AppError $e){json_response(['error'=>$e->getMessage()],$e->status);}catch(Throwable $e){error_log('HomeDojo: '.$e->getMessage());json_response(['error'=>'Sunucu bağlantısı tamamlanamadı. Lütfen daha sonra tekrar dene.'],500);}

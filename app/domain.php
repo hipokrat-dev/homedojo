@@ -29,7 +29,11 @@ function upgrade_state(array $state): array {
             }
         }unset($row);
     }
-    $state['version'] = 6;
+    foreach($state['users'] as &$u){
+        $u['memberType'] ??= (($u['role']??'')==='admin'||mb_strtolower($u['name'],'UTF-8')==='anne')?'parent':'child';
+        if($u['memberType']==='young_child')$u['routineSchedule'] ??= default_routines();
+    }unset($u);
+    $state['version'] = 7;
     return $state;
 }
 function initial_state(): array { return upgrade_state(json_decode(file_get_contents(__DIR__.'/seed.json'), true, 512, JSON_THROW_ON_ERROR)); }
@@ -125,9 +129,9 @@ function mutate(array &$state,string $action,array $in,?DateTimeImmutable $now=n
         if($scope==='shared'){
             $participants=$in['participantIds']??null;
             if(!is_array($participants)||!array_is_list($participants)||count($participants)<2||count($participants)>count($state['users']))throw new AppError('Ortak görev için en az iki kişi seçin.');
-            foreach($participants as $id){if(!is_string($id))throw new AppError('Katılımcı geçersiz.');find_index($state['users'],$id,'Katılımcı');}
+            foreach($participants as $id){if(!is_string($id))throw new AppError('Katılımcı geçersiz.');active_user_index($state,$id,'Katılımcı');}
             if(count(array_unique($participants))!==count($participants))throw new AppError('Katılımcılar tekrarlanamaz.');
-        }else{$owner=valid_text($in['ownerId']??null,'Görevin veya ödülün sahibi',64);find_index($state['users'],$owner,'Kullanıcı');}
+        }else{$owner=valid_text($in['ownerId']??null,'Görevin veya ödülün sahibi',64);active_user_index($state,$owner,'Kullanıcı');}
         $value=['ownerId'=>$owner,'title'=>valid_text($in['title']??null,'Ad',80),'description'=>valid_text($in['description']??'','Açıklama',240,false),$points=>valid_points($in[$points]??null),'icon'=>valid_text($in['icon']??($task?'✨':'🎁'),'Simge',12)];
         if($task){if(!in_array($in['frequency']??null,['daily','weekly','monthly'],true))throw new AppError('Görev dönemi geçersiz.');$value['frequency']=$in['frequency'];$value['scope']=$scope;$value['participantIds']=$participants;}
         $affected=$scope==='shared'?$participants:[$owner];
@@ -146,7 +150,7 @@ function mutate(array &$state,string $action,array $in,?DateTimeImmutable $now=n
         if(count($state['competitions'])>=100)throw new AppError('En fazla 100 yarışma kaydı oluşturulabilir.');
         if(family_goal($state,$now))throw new AppError('Önce mevcut aile yarışmasını bitir veya iptal et.',409);
         $frequency=$in['frequency']??'';if(!in_array($frequency,['daily','weekly','monthly'],true))throw new AppError('Yarışma süresi geçersiz.');
-        $state['competitions'][]=['id'=>uid(),'title'=>valid_text($in['title']??null,'Yarışma adı',80),'prize'=>valid_text($in['prize']??null,'Ortak ödül',100),'icon'=>valid_text($in['icon']??'🏆','Simge',12),'target'=>valid_points($in['target']??null),'frequency'=>$frequency,'startedAt'=>$at,'endsAt'=>deadline($frequency,$now)->format(DateTimeInterface::ATOM),'participants'=>array_column($state['users'],'id'),'startIndex'=>count($state['completions'])];break;
+        $state['competitions'][]=['id'=>uid(),'title'=>valid_text($in['title']??null,'Yarışma adı',80),'prize'=>valid_text($in['prize']??null,'Ortak ödül',100),'icon'=>valid_text($in['icon']??'🏆','Simge',12),'target'=>valid_points($in['target']??null),'frequency'=>$frequency,'startedAt'=>$at,'endsAt'=>deadline($frequency,$now)->format(DateTimeInterface::ATOM),'participants'=>array_column(array_filter($state['users'],fn($u)=>empty($u['archivedAt'])),'id'),'startIndex'=>count($state['completions'])];break;
     case 'cancelCompetition': case 'claimCompetition':
         $i=find_index($state['competitions'],$in['id']??null,'Yarışma');$view=competition_snapshot($state,$state['competitions'][$i],$now);
         if($action==='claimCompetition'&&$view['status']!=='achieved')throw new AppError('Ortak ödül henüz alınamaz veya zaten alındı.',409);
@@ -163,7 +167,7 @@ function mutate(array &$state,string $action,array $in,?DateTimeImmutable $now=n
         $i=find_index($state['assignments'],$in['assignmentId']??null,'Görev');$a=$state['assignments'][$i];
         if($a['userId']!==($in['userId']??null))throw new AppError('Bu görev başka bir kullanıcıya ait.',403);
         if(assignment_status($a,$now)!=='active')throw new AppError('Yalnızca süresi dolmamış aktif görev onaya gönderilebilir.',409);
-        $reviewer=$in['reviewerId']??null;find_index($state['users'],$reviewer,'Onaycı');
+        $reviewer=$in['reviewerId']??null;$ri=active_user_index($state,$reviewer,'Onaycı');if(($state['users'][$ri]['memberType']??'')==='young_child')throw new AppError('Onay için ebeveyn veya büyük çocuk seç.',403);
         if($reviewer===$a['userId'])throw new AppError('Kendi görevini onaylayamazsın.',403);
         $state['assignments'][$i]=array_merge($a,['status'=>'pending','submittedAt'=>$at,'reviewerId'=>$reviewer]);break;
     case 'reviewAssignment':
@@ -209,3 +213,5 @@ function spin(array &$state,string $userId,string $frequency,string $requestId,?
     $state['assignments'][]=$a;
     return ['task'=>$task,'assignment'=>$a,'candidates'=>$list];
 }
+
+require_once __DIR__.'/routines.php';

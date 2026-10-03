@@ -55,7 +55,7 @@ mutate($t,'deleteReward',['id'=>'r1']);ok(balance($t,'u1')===$earned-100,'Deleti
 $legacy=$t;unset($legacy['assignments']);$legacy['version']=1;$upgraded=upgrade_state($legacy);
 ok($upgraded['assignments']===[]&&$upgraded['tasks']===$legacy['tasks']&&$upgraded['users']===$legacy['users']&&balance($upgraded,'u1')===balance($legacy,'u1'),'Version 1 migration preserves all existing data and points');
 foreach([-5,0,1.5,'20',100001]as $v)rejects(function()use(&$s,$v){mutate($s,'saveTask',['ownerId'=>'u1','title'=>'Invalid','points'=>$v,'frequency'=>'daily']);},400,'Invalid points: '.json_encode($v));
-rejects(function()use(&$s){mutate($s,'saveUser',['id'=>'intruder','name'=>'X','avatar'=>'X']);},404,'Cannot create fifth profile');
+rejects(function()use(&$s){mutate($s,'saveUser',['id'=>'intruder','name'=>'X','avatar'=>'X']);},404,'saveUser cannot edit an unknown profile');
 $t=initial_state();goal($t);$t['tasks']=[];rejects(function()use(&$t){spin($t,'u1','all',uid());},409,'Empty wheel handled');
 
 
