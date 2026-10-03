@@ -4,7 +4,7 @@ RewriteEngine On
 RewriteRule ^(?:app|data|tests|docs|server|node_modules|\.git)(?:/|$) - [F,L,NC]
 RewriteRule ^(?:\.|package|README|composer|deploy) - [F,L,NC]
 RewriteRule ^$ public/index.php [L]
-RewriteRule ^(app\.js|style\.css|favicon\.svg|api\.php|setup\.php)$ public/$1 [L]
+RewriteRule ^(app\.js|style\.css|favicon\.svg|api\.php|setup\.php|recover\.php)$ public/$1 [L]
 <IfModule mod_headers.c>
 <FilesMatch "\.(html|css|js)$">
 Header set Cache-Control "no-cache"
