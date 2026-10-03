@@ -39,6 +39,7 @@ php tests/personal-catalogs.php
 php tests/profile.php
 php tests/family.php
 php tests/progress.php
+php tests/site.php
 node --check public/app.js
 node tests/http.mjs
 find app public tests -name '*.php' -exec php -l {} \;
@@ -123,3 +124,6 @@ Ebeveyn ve admin hesaplarında **Çocuk takibi** menüsü bulunur. Gün veya haf
 Günlük başarı = onaylanan / başlangıç saati gelmiş planlı görev sayısı. Gönderilmeyen ve süresi dolan görevler de paydada yer alır. Gelecek günler ve henüz başlamamış görevler dahil edilmez; hiç görev yoksa yüzde yerine çizgi gösterilir. Bekleyen onaylar başarı sayılmaz. Haftalık toplam, görev sayıları üzerinden hesaplanır; günlük yüzdelerin basit ortalaması alınmaz. Sonradan onaylanan kayıt asıl görev gününe yazılır. Çark raporu ayrı olarak seçili tarihte alınmış görevleri izler; haftalık/aylık görevin hâlâ devam ettiği ayrıca görünür.
 
 Sürüm 8 ilk okumada takip başlangıcını veritabanına bir kez kaydeder. Günlük program değişiklikleri bugünden itibaren uygulanır ve tarihli sürümler halinde tutulur; geçmiş günlerin programı değişmez. İlk takip başlamadan önce süresi bitmiş görevler paydada sayılmaz. Önceki sürümde hiç kaydedilmeyen günler için başarısızlık uydurulmaz; eski günlerde yalnızca var olan görev kayıtları gösterilir ve takip başlangıcı panelde açıklanır. Gönderilmiş görevler düzenleme/silmeden sonra da raporda kalır. Çıkarılan çocuklar raporda Arşiv etiketiyle incelenebilir.
+
+
+Canlı alan adı `https://yapeglen.com` adresidir. Üretim için genel adres ayarı `app/site.php` dosyasından alınır; özel veritabanı ayarları değiştirilmez. Alan adı değişirse bu dosya yeni HTTPS adresiyle güncellenmelidir. Origin ve CSRF doğrulaması korunur. Geliştirme ortamında yerel `public_url` kullanılır.

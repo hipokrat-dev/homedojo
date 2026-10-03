@@ -7,10 +7,16 @@ function private_config_path(): string {
     if(getenv('APP_ENV')!=='development' && !empty($_SERVER['DOCUMENT_ROOT']))return dirname(rtrim($_SERVER['DOCUMENT_ROOT'],'/')).'/homedojo-private/config.local.php';
     return __DIR__.'/config.local.php';
 }
+function apply_site_settings(array $config): array {
+    if(($config['environment']??'production')==='production'&&is_file(__DIR__.'/site.php')){
+        $site=require __DIR__.'/site.php';$config['public_url']=$site['public_url'];
+    }
+    return $config;
+}
 function configuration(): array {
     $private=private_config_path();
-    if(is_file($private))return require $private;
-    if(is_file(__DIR__.'/config.local.php'))return require __DIR__.'/config.local.php';
+    if(is_file($private))return apply_site_settings(require $private);
+    if(is_file(__DIR__.'/config.local.php'))return apply_site_settings(require __DIR__.'/config.local.php');
     if(getenv('APP_ENV')==='development')return ['environment'=>'development','driver'=>'sqlite','sqlite_path'=>getenv('SQLITE_PATH')?:__DIR__.'/../data/homedojo.sqlite','password_hash'=>'','public_url'=>'http://localhost:3000'];
     throw new AppError('İlk kurulum henüz tamamlanmadı. Site sahibi kurulum ekranından bağlantıyı tamamlamalı.',503);
 }
