@@ -52,6 +52,7 @@ function deadline(string $frequency, ?DateTimeImmutable $now=null): DateTimeImmu
 }
 function assignment_status(array $assignment,?DateTimeImmutable $now=null): string {
     if(in_array($assignment['status']??'active',['completed','cancelled','pending'],true))return $assignment['status'];
+    if(!empty($assignment['noDeadline']))return 'active';
     if(isset($assignment['routineId'],$assignment['routineDay']))return now_tr($now)->format('Y-m-d')>$assignment['routineDay']?'expired':'active';
     return now_tr($now)>=new DateTimeImmutable($assignment['dueAt'])?'expired':'active';
 }
@@ -183,7 +184,7 @@ function mutate(array &$state,string $action,array $in,?DateTimeImmutable $now=n
             $state['assignments'][$i]['status']='active';$state['assignments'][$i]['rejectedAt']=$at;
             unset($state['assignments'][$i]['submittedAt'],$state['assignments'][$i]['reviewerId']);break;
         }
-        if(!isset($a['routineId'])&&new DateTimeImmutable($a['submittedAt'])>=new DateTimeImmutable($a['dueAt']))throw new AppError('Görev süresinde gönderilmemiş.',409);
+        if(!isset($a['routineId'])&&empty($a['noDeadline'])&&new DateTimeImmutable($a['submittedAt'])>=new DateTimeImmutable($a['dueAt']))throw new AppError('Görev süresinde gönderilmemiş.',409);
         $state['assignments'][$i]['status']='completed';$state['assignments'][$i]['completedAt']=$at;
         $state['completions'][]=['id'=>uid(),'assignmentId'=>$a['id'],'userId'=>$a['userId'],'taskId'=>$a['taskId'],'title'=>$a['title'],'icon'=>$a['icon'],'points'=>$a['points'],'frequency'=>$a['frequency'],'day'=>substr($a['submittedAt'],0,10),'at'=>$a['submittedAt'],'submittedLate'=>$a['submittedLate']??false,'approvedAt'=>$at,'approvedBy'=>$in['actorId'],'dueAt'=>$a['dueAt'],'goalTitle'=>$a['goalTitle']];break;
     case 'redeem':
@@ -198,7 +199,7 @@ function mutate(array &$state,string $action,array $in,?DateTimeImmutable $now=n
     default:throw new AppError('Bilinmeyen işlem.',404);
     }
 }
-function spin(array &$state,string $userId,string $frequency,string $requestId,?DateTimeImmutable $now=null): array {
+function spin(array &$state,string $userId,string $frequency,string $requestId,?DateTimeImmutable $now=null,bool $noDeadline=false): array {
     $state=upgrade_state($state);$u=$state['users'][find_index($state['users'],$userId,'Kullanıcı')];
     if(!in_array($frequency,['all','daily','weekly','monthly'],true))throw new AppError('Görev dönemi geçersiz.');valid_request($requestId);
     foreach($state['assignments'] as $a)if($a['requestId']===$requestId){
@@ -208,11 +209,12 @@ function spin(array &$state,string $userId,string $frequency,string $requestId,?
     }
     $goal=null;foreach($state['rewards'] as $r)if($r['id']===($u['goalRewardId']??null)&&($r['ownerId']??null)===$u['id'])$goal=$r;
     if(!$goal){$family=family_goal($state,$now);if($family)$goal=['id'=>$family['id'],'title'=>$family['prize']];}
-    if(!$goal)throw new AppError('Bir hedef ödül seç veya ortak ödüllü aile yarışması başlat.',409);
+    if(!$goal)$goal=['id'=>null,'title'=>'Görevlerimi tamamlamak'];
     $list=available_tasks($state,$userId,$frequency,$now);
     if(!$list)throw new AppError('Bu dönemde seçilebilecek görev kalmadı. Aktif görevlerini tamamla veya başka bir dönem seç.',409);
     $task=$list[random_int(0,count($list)-1)];
     $a=['id'=>uid(),'requestId'=>$requestId,'userId'=>$userId,'taskId'=>$task['id'],'title'=>$task['title'],'description'=>$task['description'],'icon'=>$task['icon'],'points'=>$task['points'],'frequency'=>$task['frequency'],'periodStart'=>period_start($task['frequency'],$now),'assignedAt'=>now_tr($now)->format(DateTimeInterface::ATOM),'dueAt'=>deadline($task['frequency'],$now)->format(DateTimeInterface::ATOM),'status'=>'active','goalRewardId'=>$goal['id'],'goalTitle'=>$goal['title']];
+    if($noDeadline)$a['noDeadline']=true;
     $state['assignments'][]=$a;
     return ['task'=>$task,'assignment'=>$a,'candidates'=>$list];
 }

@@ -17,8 +17,9 @@ function progress_date(mixed $date): DateTimeImmutable {
 function child_progress(array $s,array $actor,array $in,?DateTimeImmutable $now=null): array {
     if(($actor['memberType']??'')!=='parent'&&($actor['role']??'')!=='admin')throw new AppError('Bu panel yalnızca ebeveynlere açık.',403);
     $now=now_tr($now);$mode=$in['mode']??'day';$source=$in['source']??'daily';$childId=$in['childId']??'all';
-    if(!in_array($mode,['day','week'],true)||!in_array($source,['daily','wheel'],true)||!is_string($childId))throw new AppError('Rapor seçimi geçersiz.');
+    if(!in_array($mode,['day','week','range'],true)||!in_array($source,['daily','wheel'],true)||!is_string($childId))throw new AppError('Rapor seçimi geçersiz.');
     $selected=progress_date($in['date']??$now->format('Y-m-d'));$start=$mode==='week'?$selected->modify('-'.((int)$selected->format('N')-1).' days'):$selected;$end=$start->modify($mode==='week'?'+6 days':'+0 days');
+    if($mode==='range'){$end=progress_date($in['endDate']??null);if($end<$start||$start->diff($end)->days>365)throw new AppError('En fazla bir yıllık geçerli tarih aralığı seç.');}
     $children=array_values(array_filter($s['users'],fn($u)=>has_daily_program($u)));
     if($childId!=='all'&&!in_array($childId,array_column($children,'id'),true))throw new AppError('Çocuk profili bulunamadı.',404);
     $choices=array_map(fn($u)=>array_intersect_key($u,array_flip(['id','name','avatar','photo','memberType','archivedAt'])),$children);

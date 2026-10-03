@@ -138,3 +138,6 @@ Oyuncu şifreleri en az 4 karakterdir; sayı kullanmak yeterlidir. Eski ev şifr
 Çocuk ve küçük çocuk günlük programındaki bitiş saati hatırlatma amaçlıdır: başlangıç saati geldikten sonra gün sonuna kadar gönderilebilir. Geç gönderim kaydedilir ve ebeveyne gösterilir; ebeveyn sonraki günlerde de onaylayabilir. Puan yalnızca onay sonrası eklenir. Çarktan alınan süreli görevlerin son teslim kuralı sürer.
 
 Ebeveynlerin Sayfam ekranında aktif çocukların günlük programları bulunur. Anne dahil her ebeveyn, saati gelen bir günlük görevi çocuk bildirim göndermeden de gözlemleyerek onaylayabilir; mevcut bekleyen bildirim de bu şekilde onaylanır. Gerçek onaylayan kaydedilir ve eşzamanlı/tekrarlanan onaylar ikinci puan oluşturmaz.
+
+### Ebeveyn–çocuk odaklı kullanım
+Ebeveyn ana ekranı günlük görevler ve doğrudan onay içindir; takip ekranında gün, hafta veya en fazla bir yıllık tarih aralığı seçilir. Kullanıcı türleri Ebeveyn, Büyük çocuk ve Küçük çocuk olarak gösterilir. Çocuk menüsünde aile panosu, onaylar ve ödül kataloğu bulunmaz. Büyük çocuk görev onayını yalnızca ebeveynden isteyebilir. Ebeveyn günlük veya çark görevlerini istek gelmeden de onaylayabilir. Yeni çark görevleri tüm havuzdan seçilir, ödül seçme önkoşulu ve süre sınırı yoktur; eski görevlerin kayıtları korunur.

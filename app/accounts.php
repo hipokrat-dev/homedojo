@@ -28,16 +28,21 @@ function actor_for(array $s,array $session): ?array {
     return null;
 }
 function authorize_action(array $s,array $actor,string $action,array &$in): void {
+    if($action==='reviewAssignment'&&($actor['memberType']??'')!=='parent')throw new AppError('Görevleri yalnızca ebeveyn onaylayabilir.',403);
     $admin=['saveTask','deleteTask','saveReward','deleteReward','saveUser','createCompetition','cancelCompetition','claimCompetition','saveAccount','createAccount','archiveAccount','restoreAccount','saveRoutines'];
     if(in_array($action,$admin,true)&&($actor['role']??'member')!=='admin')throw new AppError('Bu işlem yalnızca admin hesabına açık.',403);
     if(($actor['memberType']??'')==='young_child'&&in_array($action,['spin','selectGoal','complete','redeem','cancelAssignment','reviewAssignment'],true))throw new AppError('Küçük çocuk hesabında günlük görev ekranını kullan.',403);
+    if($action==='complete'){
+        $reviewer=$s['users'][active_user_index($s,$in['reviewerId']??null,'Ebeveyn')];
+        if(($reviewer['memberType']??'')!=='parent')throw new AppError('Onay için bir ebeveyn seç.',403);
+    }
     if(in_array($action,['spin','selectGoal','complete','redeem','cancelAssignment'],true)){
         if(isset($in['userId'])&&$in['userId']!==$actor['id'])throw new AppError('Yalnızca kendi hesabında işlem yapabilirsin.',403);
         $in['userId']=$actor['id'];
     }
 }
 function member_snapshot(array $s,array $actor): array {
-    $v=snapshot($s);$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];
+    $v=snapshot($s);$allAssignments=$v['assignments'];$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];
     foreach($v['users'] as &$u){unset($u['passwordHash'],$u['authVersion'],$u['routineHistory'],$u['routineTrackingSince'],$u['routineTrackingAt']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
     $v['assignments']=array_values(array_filter($v['assignments'],fn($a)=>$a['userId']===$actor['id']||($a['reviewerId']??null)===$actor['id']));
     foreach(['completions','redemptions'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($a)=>$a['userId']===$actor['id']));
@@ -47,6 +52,7 @@ function member_snapshot(array $s,array $actor): array {
     foreach($v['users'] as &$u)if($actor['role']!=='admin'&&$u['id']!==$actor['id'])unset($u['routineSchedule'],$u['guardianId']);unset($u);
     if(has_daily_program($actor)){$v['dailyRoutines']=daily_routines($s,$actor);$v['guardianName']=routine_guardian($s,$actor)['name'];}
     $v['rewardWishes']=array_values(array_filter($v['rewardWishes']??[],fn($w)=>$w['childId']===$actor['id']||(($actor['memberType']??'')==='parent'&&($w['parentId']===$actor['id']||$actor['role']==='admin'))));
+    $v['parentAssignments']=($actor['memberType']??'')==='parent'?array_values(array_filter($allAssignments,function($a)use($s){foreach($s['users'] as $u)if($u['id']===$a['userId'])return empty($u['archivedAt'])&&has_daily_program($u)&&!isset($a['routineId'])&&in_array($a['status'],['active','pending'],true);return false;})):[];
     $v['parentDailyRoutines']=parent_daily_routines($s,$actor);
     $v['canViewProgress']=($actor['memberType']??'')==='parent'||$actor['role']==='admin';
     return $v;

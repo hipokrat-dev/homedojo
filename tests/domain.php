@@ -11,7 +11,7 @@ function rejects(callable $fn,int $status,string $name):void{try{$fn();}catch(Ap
 function goal(array &$s,string $user='u1'):void{mutate($s,'selectGoal',['userId'=>$user,'rewardId'=>array_values(array_filter($s['rewards'],fn($r)=>$r['ownerId']===$user))[0]['id']]);}
 $friday=new DateTimeImmutable('2026-10-02T12:00:00+03:00');$s=initial_state();
 ok(count($s['users'])===4&&count($s['tasks'])===40,'Four profiles with ten independent example tasks each');
-rejects(function()use(&$s,$friday){spin($s,'u1','all',uid(),$friday);},409,'Choose target reward before spinning');
+$withoutGoal=$s;$simple=spin($withoutGoal,'u1','all',uid(),$friday,true);ok($simple['assignment']['goalRewardId']===null,'Wheel works without a reward target');ok(assignment_status($simple['assignment'],$friday->modify('+40 days'))==='active','New untimed wheel task stays active');
 goal($s);$draw=spin($s,'u1','all','draw-request-123456',$friday);$a=$draw['assignment'];
 ok(count($draw['candidates'])===10&&count($s['assignments'])===1,'Draw persists an assignment from ten candidates');
 ok(snapshot($s,$friday)['users'][0]['goal']['id']==='r1','Selected target is persisted');

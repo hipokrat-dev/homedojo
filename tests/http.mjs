@@ -46,7 +46,7 @@ try{
  assert.equal((await request('selectGoal',{rewardId:ownReward})).status,200);
  const draws=await Promise.all([request('spin',{frequency:'daily',requestId:'same-draw-1234567890'}),request('spin',{frequency:'daily',requestId:'same-draw-1234567890'})]);
  assert.deepEqual(draws.map(r=>r.status),[200,200]);assert.equal(draws[0].body.assignment.id,draws[1].body.assignment.id);
- const a=draws[0].body.assignment;assert.equal(Date.parse(a.dueAt)-Date.parse(a.assignedAt),86400000);
+ const a=draws[0].body.assignment;assert.equal(a.noDeadline,true,'New wheel assignments have no countdown');
  assert.equal((await request('complete',{assignmentId:a.id,reviewerId:'u2'})).status,403);
  assert.equal((await request('complete',{assignmentId:a.id,reviewerId:'missing'})).status,404);
  const submissions=await Promise.all([request('complete',{assignmentId:a.id,reviewerId:'u1',points:100000}),request('complete',{assignmentId:a.id,reviewerId:'u1'})]);assert.deepEqual(submissions.map(r=>r.status).sort(),[200,409]);
@@ -144,6 +144,15 @@ try{
  use(observingParent);const parentView=(await request('state')).body.state;assert.ok(parentView.parentDailyRoutines.some(c=>c.id==='u3'));assert.ok(!JSON.stringify(parentView.parentDailyRoutines).includes('passwordHash'));
  const observed=await Promise.all([request('parentApproveRoutine',{childId:'u3',routineId:'observe-day',day:parentView.today}),request('parentApproveRoutine',{childId:'u3',routineId:'observe-day',day:parentView.today})]);assert.deepEqual(observed.map(r=>r.status),[200,200]);
  use(other);const observedState=(await request('state')).body.state;assert.equal(observedState.completions.filter(c=>c.taskId==='routine-observe-day').length,1);use(observingParent);
+ // Parent-only supervision, arbitrary dates and observed wheel completion.
+ const supervisingParent={cookie,csrf};use(admin);assert.equal((await request('saveTask',{ownerId:'u3',title:'Supervised wheel fixture',description:'',points:12,icon:'📚',frequency:'daily'})).status,200);use(other);
+ const noGoalDraw=await request('spin',{frequency:'weekly',requestId:'supervised-wheel-123456'});assert.equal(noGoalDraw.status,200);assert.equal(noGoalDraw.body.assignment.noDeadline,true);
+ assert.equal((await request('complete',{assignmentId:noGoalDraw.body.assignment.id,reviewerId:'u4'})).status,403,'Child cannot request sibling approval');
+ assert.equal((await request('reviewAssignment',{assignmentId:noGoalDraw.body.assignment.id,decision:'approve'})).status,403,'Child cannot approve tasks');
+ use(supervisingParent);assert.ok((await request('state')).body.state.parentAssignments.some(a=>a.id===noGoalDraw.body.assignment.id));
+ const observedWheel=await Promise.all([request('parentApproveAssignment',{assignmentId:noGoalDraw.body.assignment.id}),request('parentApproveAssignment',{assignmentId:noGoalDraw.body.assignment.id})]);assert.deepEqual(observedWheel.map(r=>r.status),[200,200]);
+ const ranged=await request('progress&mode=range&date=2026-09-28&endDate=2026-10-03');assert.equal(ranged.status,200);assert.equal(ranged.body.report.start,'2026-09-28');assert.equal(ranged.body.report.end,'2026-10-03');assert.equal(ranged.body.report.days.length,6);
+ assert.equal((await request('progress&mode=range&date=2026-10-03&endDate=2026-10-02')).status,400);
  // Child reward requests: nonadmin parent pricing, concurrent review and privacy.
  const wishParent={cookie,csrf};use(other);
  const wishInput={requestId:'wish-http-request-12345',title:'Aile sineması',icon:'🎬',parentId:'u2',cost:1,childId:'u4'};

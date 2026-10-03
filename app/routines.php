@@ -91,3 +91,16 @@ function parent_approve_routine(array &$s,array $actor,array $in,?DateTimeImmuta
         mutate($s,'reviewAssignment',['assignmentId'=>$a['id'],'actorId'=>$parent['id'],'decision'=>'approve'],$now);return;
     }
 }
+
+function parent_approve_assignment(array &$s,array $actor,array $in,?DateTimeImmutable $now=null): void {
+    $p=$s['users'][active_user_index($s,$actor['id'])];if(($p['memberType']??'')!=='parent')throw new AppError('Yalnızca ebeveyn onaylayabilir.',403);
+    $i=find_index($s['assignments'],$in['assignmentId']??null,'Görev');$a=$s['assignments'][$i];
+    $child=$s['users'][active_user_index($s,$a['userId'],'Çocuk')];if(!has_daily_program($child))throw new AppError('Bir çocuk görevi seç.',403);
+    if(isset($a['routineId']))throw new AppError('Günlük görev panelini kullan.',400);
+    if($a['status']==='completed')return;
+    if(assignment_status($a,$now)==='active')mutate($s,'complete',['assignmentId'=>$a['id'],'userId'=>$child['id'],'reviewerId'=>$p['id']],$now);
+    elseif($a['status']!=='pending')throw new AppError('Bu görev onaylanamaz.',409);
+    $s['assignments'][$i]['originalReviewerId'] ??= $s['assignments'][$i]['reviewerId'];
+    $s['assignments'][$i]['reviewerId']=$p['id'];$s['assignments'][$i]['observedBy']=$p['id'];$s['assignments'][$i]['observedAt']=now_tr($now)->format(DateTimeInterface::ATOM);
+    mutate($s,'reviewAssignment',['assignmentId'=>$a['id'],'actorId'=>$p['id'],'decision'=>'approve'],$now);
+}
