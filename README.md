@@ -6,11 +6,11 @@ Dört kişilik ev ekibi için Türkçe, mobil uyumlu görev ve ödül uygulamas�
 
 - Ana sayfada dört düzenlenebilir profil, ayrı bakiye ve toplam puan/seviye göstergesi.
 - Görev ekleme, düzenleme, silme; görev başına ayrı puan.
-- Türkiye saatine göre günlük, pazartesi yenilenen haftalık ve ayın ilk günü yenilenen aylık görevler.
+- Atama anından başlayan süreler: 1 gün (24 saat), 1 hafta (7 gün), 1 ay (sonraki ayın aynı günü ve saati; o gün yoksa ayın son günü).
 - Önce hedef ödül seçimi; görev adları ve puanlarını gösteren, günlük/haftalık/aylık filtreli animasyonlu çark. Sunucudaki rastgele seçim görevi, puanını ve son tarihini kalıcı olarak atar.
 - Ana sayfada atanmış görevler, geri sayım ve hedef ödül ilerlemesi. Çevirme puan kazandırmaz; zamanında tamamlamak kazandırır.
-- Günlük görev o günün sonunda, haftalık görev pazartesi 00:00, aylık görev sonraki ayın 1’i 00:00 Türkiye saatinde sona erer. Son tarihe eşit veya sonraki tamamlama isteği sunucuda reddedilir; süresi dolan kayıt geçmişte sıfır puanla görünür.
-- Atanmış görevin başlığı, puanı ve süresi sabitlenir; görev havuzunu sonradan düzenlemek bu atamayı değiştirmez. Aynı görev aynı profile bir dönemde yalnızca bir kez atanır.
+- Son tarih sunucuda, görevin çarktan alındığı an referans alınarak hesaplanır. Son tarihe eşit veya sonraki tamamlama isteği sunucuda reddedilir; süresi dolan kayıt geçmişte sıfır puanla görünür.
+- Atanmış görevin başlığı, puanı ve süresi sabitlenir; görev havuzunu sonradan düzenlemek bu atamayı değiştirmez. Tamamlanan görev kendi kayıtlı süresi dolana kadar tekrar alınamaz. İptal edilen görev puan vermez; geçmişte tutulur ve yeniden seçilebilir.
 - Açık sayfa 15 saniyede bir güncellenir; profil hedefi, atamalar, kazanımlar ve ödül geçmişi veritabanında tutulur.
 - Düzenlenebilir ödüller; yeterli bakiye ile alma, puanı düşme ve geçmiş kaydı.
 - Görev/ödül değişiklikleri geçmiş puan kayıtlarını değiştirmez.
@@ -66,3 +66,11 @@ Hostinger, GitHub'daki `main` dalını izler. Bu dala gönderilen veya birleşti
 ### Sürüm 2 veri geçişi
 
 Mevcut JSON kaydına `assignments` alanı eklenir; eski profiller, görevler, puanlar ve ödül geçmişi korunur. On örnek görev yalnızca yeni kurulumda oluşturulur. Süre aşımı sunucu saatinden hesaplandığı için ayrıca cron işi gerekmez. Eski tamamlamalar geçerli dönem içinde yeniden görev seçimini engeller.
+
+## Kişisel sayfalar ve aile yarışmaları
+
+Her profilin `#profile/u1` … `#profile/u4` adresinde kendi sayfası vardır. Yenilemede sayfa ve profil korunur. Aile panosu dört kişinin toplam kazanılan ve kullanılabilir puanını gösterir; sıralama toplam kazanımla yapılır. Bu, ortak ev oturumu içinde profil ayrımıdır; ayrı şifreli dört hesap değildir.
+
+Aile yarışması için ad, ortak büyük ödül, toplam hedef puan ve süre belirlenir. Dört profil otomatik katılır. Yarışma başlangıcından sonra tamamlanan görevler, yarışma son tarihinden önceyse ortak hedefe katkı sağlar. Önceden alınmış fakat yarışma sırasında tamamlanan görevler de sayılır; önceden kazanılmış puanlar sayılmaz. İptal/süre aşımı puan kazandırmaz. Bir seferde bir aktif yarışma başlatılır; katkı sıralaması, sonuç ve iptal kayıtları saklanır. Ortak ödül hedefe ulaşınca alındı olarak işaretlenebilir; kişisel puan bakiyeleri düşmez. Bu bir aile içi ödül kaydıdır, dışarıdan ürün satın alma işlemi değildir.
+
+Sürüm 3 geçişi `competitions` alanını ekler. Eski görev atamalarının mevcut son tarihleri korunur; yeni süre hesabı yeni atamalarda geçerlidir. Aktif yarışmanın süresi ve puan hedefi başlangıçta sabitlenir; gerekirse iptal edilip yeni yarışma başlatılır.

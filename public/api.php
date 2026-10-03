@@ -7,7 +7,7 @@ try{
     $development=($config['environment']??'production')==='development';
     if(!$development&&empty($config['password_hash']))throw new RuntimeException('Password is required in production.');
     $authenticated=$development&&!$config['password_hash']||(!empty($_SESSION['authenticated'])&&($_SESSION['expires']??0)>time());
-    $writes=['login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem'];
+    $writes=['login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem','cancelAssignment','createCompetition','cancelCompetition','claimCompetition'];
     if(in_array($action,$writes,true)){
         if($method!=='POST')throw new AppError('Bu işlem POST gerektirir.',405);
         if(($_SERVER['HTTP_SEC_FETCH_SITE']??'')==='cross-site')throw new AppError('Bu kaynaktan işlem yapılamaz.',403);

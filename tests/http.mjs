@@ -38,6 +38,21 @@ try{
  const claims=await Promise.all([request('redeem',{userId:'u1',rewardId:'r1',requestId:'redemption-12345678'}),request('redeem',{userId:'u1',rewardId:'r1',requestId:'redemption-12345678'})]);assert.deepEqual(claims.map(r=>r.status).sort(),[200,409]);
  const result=await request('state');assert.equal(result.body.state.users[0].balance,assignment.points);assert.equal(result.body.state.users[0].earned,assignment.points+100);assert.equal(result.body.state.users[1].balance,0);assert.equal(result.body.state.users[0].goal,null);
  assert.equal(result.body.state.assignments.length,2);assert.equal(result.body.state.completions.length,2);
+ const created=await request('createCompetition',{title:'Aile yarışı',prize:'Piknik',target:80,frequency:'weekly'});assert.equal(created.status,200);const contest=created.body.state.competitions.at(-1);
+ assert.equal((await request('claimCompetition',{id:contest.id})).status,409);
+ await request('saveTask',{title:'Birlikte görev',description:'',points:80,icon:'✨',frequency:'daily'});
+ const cancelled=(await request('spin',{userId:'u3',frequency:'daily',requestId:'cancel-draw-12345678'})).body.assignment;
+ assert.equal((await request('cancelAssignment',{userId:'u2',assignmentId:cancelled.id})).status,403);
+ assert.equal((await request('cancelAssignment',{userId:'u3',assignmentId:cancelled.id})).status,200);
+ assert.equal((await request('complete',{userId:'u3',assignmentId:cancelled.id})).status,409);
+ const familyAssignment=(await request('spin',{userId:'u3',frequency:'daily',requestId:'family-draw-12345678'})).body.assignment;
+ assert.equal(Date.parse(familyAssignment.dueAt)-Date.parse(familyAssignment.assignedAt),86400000,'daily deadline starts at assignment');
+ const won=await request('complete',{userId:'u3',assignmentId:familyAssignment.id});assert.equal(won.body.state.competitions.at(-1).total,80);assert.equal(won.body.state.competitions.at(-1).status,'achieved');
+ const sharedClaims=await Promise.all([request('claimCompetition',{id:contest.id}),request('claimCompetition',{id:contest.id})]);assert.deepEqual(sharedClaims.map(r=>r.status).sort(),[200,409]);
+ assert.equal((await request('state')).body.state.users.find(u=>u.id==='u3').balance,80,'shared prize does not spend personal balance');
+ await request('selectGoal',{userId:'u4',rewardId:'r1'});
+ const raceAssignment=(await request('spin',{userId:'u4',frequency:'daily',requestId:'race-draw-1234567890'})).body.assignment;
+ const race=await Promise.all([request('cancelAssignment',{userId:'u4',assignmentId:raceAssignment.id}),request('complete',{userId:'u4',assignmentId:raceAssignment.id})]);assert.deepEqual(race.map(r=>r.status).sort(),[200,409],'cancel versus complete has exactly one winner');
  assert.equal((await request('logout',{})).status,200);assert.equal((await request('state')).status,401);
- console.log('✓ HTTP authentication, CSRF, origin, session rotation, persisted goal and assignments, concurrent draw/completion/reward retries, frozen points, task CRUD, reward debit and logout passed.');
+ console.log('✓ HTTP authentication, CSRF, origin, session rotation, persisted goal and assignments, concurrent draw/completion/reward retries, frozen points, task CRUD, reward debit, relative deadlines, cancellation races, shared competition scoring/claims and logout passed.');
 }finally{if(server){server.kill();await new Promise(r=>server.once('exit',r));}await rm(dir,{recursive:true,force:true});}

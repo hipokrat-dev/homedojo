@@ -24,10 +24,10 @@ ok(balance($s,'u1')===$a['points']&&balance($s,'u2')===0,'Frozen points survive 
 ok($s['completions'][0]['title']===$a['title'],'Historical title preserved');
 rejects(function()use(&$s,$a,$friday){mutate($s,'complete',['userId'=>'u1','assignmentId'=>$a['id']],$friday);},409,'Duplicate completion cannot award twice');
 ok(assignment_status($s['assignments'][0],$friday->modify('+2 months'))==='completed','Completed tasks never become expired');
-foreach(['daily'=>'2026-10-03T00:00:00+03:00','weekly'=>'2026-10-05T00:00:00+03:00','monthly'=>'2026-11-01T00:00:00+03:00']as $frequency=>$end){
+foreach(['daily'=>'2026-10-03T12:00:00+03:00','weekly'=>'2026-10-09T12:00:00+03:00','monthly'=>'2026-11-02T12:00:00+03:00']as $frequency=>$end){
  $t=initial_state();$t['tasks']=array_values(array_filter($t['tasks'],fn($x)=>$x['frequency']===$frequency));$t['tasks']=[$t['tasks'][0]];goal($t);
  $d=spin($t,'u1',$frequency,uid(),$friday);$a=$d['assignment'];$boundary=new DateTimeImmutable($end);
- ok($a['dueAt']===$end,"$frequency calendar deadline in Istanbul");
+ ok($a['dueAt']===$end,"$frequency deadline relative to assignment time");
  $before=$t;mutate($before,'complete',['userId'=>'u1','assignmentId'=>$a['id']],$boundary->modify('-1 second'));
  ok(balance($before,'u1')===$a['points'],"$frequency allows completion one second before deadline");
  rejects(function()use(&$t,$a,$boundary){mutate($t,'complete',['userId'=>'u1','assignmentId'=>$a['id']],$boundary);},409,"$frequency rejects completion exactly at deadline");
@@ -36,7 +36,7 @@ foreach(['daily'=>'2026-10-03T00:00:00+03:00','weekly'=>'2026-10-05T00:00:00+03:
  rejects(function()use(&$t,$a,$boundary){mutate($t,'complete',['userId'=>'u1','assignmentId'=>$a['id']],$boundary->modify('+1 second'));},409,"$frequency old expired assignment remains blocked after new draw");
  rejects(function()use(&$t,$frequency,$boundary){spin($t,'u1',$frequency,uid(),$boundary);},409,"$frequency cannot draw same task twice in period");
 }
-ok(deadline('monthly',new DateTimeImmutable('2028-02-29T23:59:59+03:00'))->format('Y-m-d')==='2028-03-01','Leap month deadline');
+ok(deadline('monthly',new DateTimeImmutable('2028-02-29T23:59:59+03:00'))->format('Y-m-d')==='2028-03-29','One calendar month after leap day');
 ok(period_start('weekly',new DateTimeImmutable('2027-01-01T12:00:00+03:00'))==='2026-12-28','Week across year boundary');
 ok(deadline('daily',new DateTimeImmutable('2026-10-02T21:00:00Z'))->format('Y-m-d')==='2026-10-04','UTC converted to Istanbul before deadline calculation');
 $t=initial_state();goal($t);foreach($t['tasks']as $_){$d=spin($t,'u1','all',uid(),$friday);mutate($t,'complete',['userId'=>'u1','assignmentId'=>$d['assignment']['id']],$friday);}
@@ -53,4 +53,35 @@ ok($upgraded['assignments']===[]&&$upgraded['tasks']===$legacy['tasks']&&$upgrad
 foreach([-5,0,1.5,'20',100001]as $v)rejects(function()use(&$s,$v){mutate($s,'saveTask',['title'=>'Invalid','points'=>$v,'frequency'=>'daily']);},400,'Invalid points: '.json_encode($v));
 rejects(function()use(&$s){mutate($s,'saveUser',['id'=>'intruder','name'=>'X','avatar'=>'X']);},404,'Cannot create fifth profile');
 $t=initial_state();goal($t);$t['tasks']=[];rejects(function()use(&$t){spin($t,'u1','all',uid());},409,'Empty wheel handled');
+
+
+// Cancellation and relative-duration boundaries.
+$t=initial_state();goal($t);$a=spin($t,'u1','daily',uid(),$friday)['assignment'];
+rejects(function()use(&$t,$a,$friday){mutate($t,'cancelAssignment',['userId'=>'u2','assignmentId'=>$a['id']],$friday);},403,'Another profile cannot cancel assignment');
+mutate($t,'cancelAssignment',['userId'=>'u1','assignmentId'=>$a['id']],$friday);
+ok(assignment_status($t['assignments'][0],$friday->modify('+1 month'))==='cancelled','Cancellation remains in history');
+rejects(function()use(&$t,$a,$friday){mutate($t,'complete',['userId'=>'u1','assignmentId'=>$a['id']],$friday);},409,'Cancelled task cannot earn points');
+ok(in_array($a['taskId'],array_column(available_tasks($t,'u1','all',$friday),'id'))&&balance($t,'u1')===0,'Cancelled task returns to wheel without points');
+ok(deadline('monthly',new DateTimeImmutable('2027-01-31T15:42:13+03:00'))->format(DateTimeInterface::ATOM)==='2027-02-28T15:42:13+03:00','Month end clamps day and preserves time');
+ok(deadline('monthly',new DateTimeImmutable('2028-01-31T15:42:13+03:00'))->format('Y-m-d')==='2028-02-29','Month end respects leap year');
+$t=initial_state();goal($t);$a=spin($t,'u1','daily',uid(),$friday)['assignment'];mutate($t,'complete',['userId'=>'u1','assignmentId'=>$a['id']],$friday);
+ok(!in_array($a['taskId'],array_column(available_tasks($t,'u1','all',new DateTimeImmutable('2026-10-03T01:00:00+03:00')),'id')),'Midnight does not reset completed rolling-duration task');
+// Competitions count only new on-time completions, even with identical second timestamps.
+mutate($t,'createCompetition',['title'=>'Family week','prize'=>'Picnic','target'=>1,'frequency'=>'weekly'],$friday);
+$c=$t['competitions'][0];ok(competition_snapshot($t,$c,$friday)['total']===0,'Competition excludes points earned before creation in same second');
+rejects(function()use(&$t,$friday){mutate($t,'createCompetition',['title'=>'Other','prize'=>'Other','target'=>1,'frequency'=>'daily'],$friday);},409,'Only one ongoing family competition');
+$a=spin($t,'u2','daily',uid(),$friday)['assignment'];ok($a['goalTitle']==='Picnic','Shared prize permits spinning without personal goal');
+rejects(function()use(&$t,$c,$friday){mutate($t,'claimCompetition',['id'=>$c['id']],$friday);},409,'Shared prize cannot be claimed before target');
+mutate($t,'complete',['userId'=>'u2','assignmentId'=>$a['id']],$friday);
+$view=competition_snapshot($t,$c,$friday);ok($view['total']===$a['points']&&$view['leaderboard'][0]['userId']==='u2'&&$view['status']==='achieved','New completion counts once for family and contributor ranking');
+$before=balance($t,'u2');mutate($t,'claimCompetition',['id'=>$c['id']],$friday);
+ok(balance($t,'u2')===$before&&competition_snapshot($t,$t['competitions'][0],$friday)['status']==='claimed','Shared prize preserves personal balance');
+rejects(function()use(&$t,$c,$friday){mutate($t,'claimCompetition',['id'=>$c['id']],$friday);},409,'Shared reward cannot be claimed twice');
+mutate($t,'createCompetition',['title'=>'Tomorrow','prize'=>'Trip','target'=>1000,'frequency'=>'daily'],$friday);$c=$t['competitions'][1];
+$a=spin($t,'u3','monthly',uid(),$friday)['assignment'];$end=deadline('daily',$friday);mutate($t,'complete',['userId'=>'u3','assignmentId'=>$a['id']],$end);
+ok(competition_snapshot($t,$c,$end)['total']===0&&competition_snapshot($t,$c,$end)['status']==='expired','Completion at contest deadline earns personal points but no contest points');
+mutate($t,'createCompetition',['title'=>'Cancelled','prize'=>'Trip','target'=>1000,'frequency'=>'weekly'],$end);$c=$t['competitions'][2];mutate($t,'cancelCompetition',['id'=>$c['id']],$end);
+ok(competition_snapshot($t,$t['competitions'][2],$end)['status']==='cancelled','Cancelled contest history retained');
+rejects(function()use(&$t,$c,$end){mutate($t,'claimCompetition',['id'=>$c['id']],$end);},409,'Cancelled contest cannot award prize');
+$old=initial_state();unset($old['competitions']);$old['version']=2;$up=upgrade_state($old);ok($up['competitions']===[]&&$up['users']===$old['users']&&$up['tasks']===$old['tasks'],'Version 3 migration preserves prior records');
 echo "$passed domain checks passed.\n";
