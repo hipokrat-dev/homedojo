@@ -12,6 +12,7 @@ try{
  server=spawn('php',['-S','127.0.0.1:3097','-t',join(dir,'public')],{env:{...process.env,APP_ENV:'development'},stdio:'ignore'});
  let ready=false;for(let i=0;i<50;i++){try{await fetch(base);ready=true;break;}catch{await new Promise(r=>setTimeout(r,100));}}
  assert.ok(ready,'test server started');
+ const shell=await fetch(base);assert.match(shell.headers.get('cache-control'),/no-store/);const html=await shell.text();assert.match(html,/app\.js\?v=[a-f0-9]{16}/);assert.match(html,/style\.css\?v=[a-f0-9]{16}/);
  async function request(action,data,overrides={}){const res=await fetch(`${base}/api.php?action=${action}`,{method:data===undefined?'GET':'POST',headers:{Cookie:cookie,Origin:base,'Content-Type':'application/json','X-CSRF-Token':csrf,...overrides},...(data===undefined?{}:{body:JSON.stringify(data)})});const set=res.headers.get('set-cookie');if(set)cookie=set.split(';')[0];return {status:res.status,body:await res.json()};}
  const session=await request('session');csrf=session.body.csrf;assert.equal(session.body.authenticated,false);
  assert.equal((await request('state')).status,401,'anonymous data access rejected');

@@ -74,3 +74,5 @@ Her profilin `#profile/u1` … `#profile/u4` adresinde kendi sayfası vardır. Y
 Aile yarışması için ad, ortak büyük ödül, toplam hedef puan ve süre belirlenir. Dört profil otomatik katılır. Yarışma başlangıcından sonra tamamlanan görevler, yarışma son tarihinden önceyse ortak hedefe katkı sağlar. Önceden alınmış fakat yarışma sırasında tamamlanan görevler de sayılır; önceden kazanılmış puanlar sayılmaz. İptal/süre aşımı puan kazandırmaz. Bir seferde bir aktif yarışma başlatılır; katkı sıralaması, sonuç ve iptal kayıtları saklanır. Ortak ödül hedefe ulaşınca alındı olarak işaretlenebilir; kişisel puan bakiyeleri düşmez. Bu bir aile içi ödül kaydıdır, dışarıdan ürün satın alma işlemi değildir.
 
 Sürüm 3 geçişi `competitions` alanını ekler. Eski görev atamalarının mevcut son tarihleri korunur; yeni süre hesabı yeni atamalarda geçerlidir. Aktif yarışmanın süresi ve puan hedefi başlangıçta sabitlenir; gerekirse iptal edilip yeni yarışma başlatılır.
+
+Ana HTML PHP üzerinden önbelleksiz sunulur; JavaScript ve CSS adresleri içerik özetine göre sürümlenir. Böylece her otomatik dağıtım yeni dosya adresi üretir. Önceden açık sekmeler yeni sürüm için yenilenmelidir.
