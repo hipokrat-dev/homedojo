@@ -167,7 +167,7 @@ function confirmParentRoutine(childId,routineId){
 }
 function personalPanel(){
  const u=user();if(u.memberType==='parent')return `${parentDailyPanel()}${parentAssignmentsPanel()}`;const active=state.assignments.filter(a=>a.userId===selected&&assignmentStatus(a)==='active').length,pending=state.assignments.filter(a=>a.userId===selected&&a.status==='pending').length;
- return `${u.memberType==='parent'?parentDailyPanel():''}${u.memberType==='child'?`<section class="daily-shortcut panel"><span aria-hidden="true">☀️</span><div><h2>Bugünün küçük adımları</h2><p>${(state.dailyRoutines||[]).filter(t=>t.status==='active').length} günlük görev seni bekliyor.</p></div><button class="primary" data-nav="daily">Günlük görevler →</button></section>`:''}<div class="stats-grid"><div class="panel stat"><strong>${number(u.balance)}</strong><span class="quiet">Kullanılabilir puan</span></div><div class="panel stat"><strong>${active}</strong><span class="quiet">Aktif görev</span></div><div class="panel stat"><strong>${pending}</strong><span class="quiet">Onay bekleyen</span></div></div>${assignmentsPanel()}`;
+ return `${u.memberType==='parent'?parentDailyPanel():''}${u.memberType==='child'?`<section class="daily-shortcut panel"><span aria-hidden="true">☀️</span><div><h2>Bugünün küçük adımları</h2><p>${(state.dailyRoutines||[]).filter(t=>t.status==='active').length} günlük görev seni bekliyor.</p></div><button class="primary" data-nav="daily">Günlük görevler →</button></section>`:''}<div class="stats-grid"><div class="panel stat"><strong>${number(u.balance)}</strong><span class="quiet">Kullanılabilir puan</span></div><div class="panel stat"><strong>${active}</strong><span class="quiet">Aktif görev</span></div><div class="panel stat"><strong>${pending}</strong><span class="quiet">Onay bekleyen</span></div></div>${u.memberType==='child'?`<section class="wish-shortcut"><div><strong>Bir hayalin mi var? 🎁</strong><p class="quiet">Ebeveyninden ödül iste, görevlerle hedefine yaklaş.</p></div><div class="goal-actions"><button class="primary" data-action="new-wish">${icon('gift')} Ödül iste</button><button class="text-button" data-nav="wishes">İsteklerim ve hedefim →</button></div></section>`:''}${assignmentsPanel()}`;
 }
 
 function competitionEditor(){
@@ -185,7 +185,7 @@ window.addEventListener('hashchange',()=>{if(spinning||busy)return;readRoute();m
 function render(){
  if(!state)return;selected=state.viewerId;
  if(user().memberType==='young_child'){if(page!=='account')page='profile';history.replaceState(null,'',page==='account'?'#account':'#profile/'+selected);root.innerHTML=kidScreen();if(page==='account')bindProfileSettings();return;}
- if(['home','competitions','rewards','wishes'].includes(page))page='profile';
+ if(['home','competitions','rewards'].includes(page))page='profile';
  if(user().memberType==='child'&&['approvals','progress','admin'].includes(page))page='profile';
  if(user().memberType==='parent'&&['wheel','daily','history'].includes(page))page='profile';
  if(['tasks','settings'].includes(page))page='admin';
@@ -197,7 +197,7 @@ function render(){
  if(page==='wheel'){root.innerHTML=wheelExperience();wheelAngle=0;drawWheel();return;}
  const pending=state.assignments.filter(a=>a.reviewerId===selected&&a.status==='pending').length;
  const isParent=user().memberType==='parent';
- const nav=isParent?[['profile','Günlük görevler','tasks'],['progress','Tamamlanma takibi','star'],['approvals',`Onay bekleyenler${pending?' · '+pending:''}`,'check'],['account','Profil ayarları','settings']]:[['profile','Sayfam','home'],['daily','Günlük görevler','tasks'],['wheel','Görev çarkı','wheel'],['account','Profil ayarları','settings']];
+ const nav=isParent?[['profile','Günlük görevler','tasks'],['progress','Tamamlanma takibi','star'],['approvals',`Onay bekleyenler${pending?' · '+pending:''}`,'check'],['wishes','Ödül istekleri','gift'],['account','Profil ayarları','settings']]:[['profile','Sayfam','home'],['daily','Günlük görevler','tasks'],['wheel','Görev çarkı','wheel'],['account','Profil ayarları','settings']];
  if(state.viewerRole==='admin')nav.push(['admin','Yönetim','settings']);
  const titles={wishes:user().memberType==='child'?'Hayallerin burada başlıyor':'Çocukların hayalleri',daily:'Günlük görevlerin',progress:'Çocukların küçük adımları',account:'Profil ayarların',home:'Ailenin başarı panosu',profile:`Merhaba, ${esc(user().name)}.`,rewards:'Sıradaki hedefin',approvals:'Onay bekleyen görevler',admin:'Yönetim merkezi',history:'Görev geçmişim',competitions:'Aile yarışmaları'};
  const contents={wishes:rewardWishesPanel,daily:childDailyPanel,progress:progressPanel,account:profileSettings,home:()=>`${profileCards()}${familySummary()}<div class="dashboard-footer"><span>Toplam kazanılan puana göre sıralanır.</span><button class="secondary" data-nav="profile">Sayfama git ${icon('arrow')}</button></div>`,profile:personalPanel,rewards:()=>rewardsPanel(true),approvals:approvalsPanel,admin:adminPanel,history:historyPanel,competitions:()=>`${familySummary()}<button class="secondary" data-nav="profile">Aile panosuna dön</button>`};
