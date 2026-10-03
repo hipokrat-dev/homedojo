@@ -19,7 +19,7 @@ final class Store {
         $sql=($this->mysql?'INSERT IGNORE':'INSERT OR IGNORE').' INTO homedojo_state (id,payload) VALUES (1,?)';$this->db->prepare($sql)->execute([json_encode(initial_state(),JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE)]);
         $this->db->exec('CREATE TABLE IF NOT EXISTS homedojo_login_limits (ip_hash VARCHAR(64) PRIMARY KEY, attempts INT NOT NULL, reset_at BIGINT NOT NULL)'.($this->mysql?' ENGINE=InnoDB':''));
     }
-    public function read(): array { $row=$this->db->query('SELECT payload FROM homedojo_state WHERE id=1')->fetchColumn(); if(!$row)throw new RuntimeException('Database is not initialized.');return upgrade_state(json_decode($row,true,512,JSON_THROW_ON_ERROR)); }
+    public function read(): array { $row=$this->db->query('SELECT payload FROM homedojo_state WHERE id=1')->fetchColumn(); if(!$row)throw new RuntimeException('Database is not initialized.');$state=json_decode($row,true,512,JSON_THROW_ON_ERROR);if(($state['version']??0)<8)return $this->update(function(array &$s): void {});return upgrade_state($state); }
     public function update(callable $fn): array {
         if($this->mysql)$this->db->beginTransaction();else $this->db->exec('BEGIN IMMEDIATE');
         try{$state=json_decode($this->db->query('SELECT payload FROM homedojo_state WHERE id=1'.($this->mysql?' FOR UPDATE':''))->fetchColumn(),true,512,JSON_THROW_ON_ERROR);$state=upgrade_state($state);$fn($state);$this->db->prepare('UPDATE homedojo_state SET payload=? WHERE id=1')->execute([json_encode($state,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE)]);if($this->mysql)$this->db->commit();else $this->db->exec('COMMIT');return $state;}

@@ -31,9 +31,9 @@ function upgrade_state(array $state): array {
     }
     foreach($state['users'] as &$u){
         $u['memberType'] ??= (($u['role']??'')==='admin'||mb_strtolower($u['name'],'UTF-8')==='anne')?'parent':'child';
-        if($u['memberType']==='young_child')$u['routineSchedule'] ??= default_routines();
+        if(has_daily_program($u)){$u['routineSchedule'] ??= default_routines();if(!isset($u['routineHistory']))record_routine_program($u);}
     }unset($u);
-    $state['version'] = 7;
+    $state['version'] = 8;
     return $state;
 }
 function initial_state(): array { return upgrade_state(json_decode(file_get_contents(__DIR__.'/seed.json'), true, 512, JSON_THROW_ON_ERROR)); }
@@ -166,6 +166,7 @@ function mutate(array &$state,string $action,array $in,?DateTimeImmutable $now=n
     case 'complete':
         $i=find_index($state['assignments'],$in['assignmentId']??null,'Görev');$a=$state['assignments'][$i];
         if($a['userId']!==($in['userId']??null))throw new AppError('Bu görev başka bir kullanıcıya ait.',403);
+        if(isset($a['routineId']))throw new AppError('Bu görevi günlük programından tamamla.',403);
         if(assignment_status($a,$now)!=='active')throw new AppError('Yalnızca süresi dolmamış aktif görev onaya gönderilebilir.',409);
         $reviewer=$in['reviewerId']??null;$ri=active_user_index($state,$reviewer,'Onaycı');if(($state['users'][$ri]['memberType']??'')==='young_child')throw new AppError('Onay için ebeveyn veya büyük çocuk seç.',403);
         if($reviewer===$a['userId'])throw new AppError('Kendi görevini onaylayamazsın.',403);

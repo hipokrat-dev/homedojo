@@ -38,6 +38,7 @@ php tests/accounts.php
 php tests/personal-catalogs.php
 php tests/profile.php
 php tests/family.php
+php tests/progress.php
 node --check public/app.js
 node tests/http.mjs
 find app public tests -name '*.php' -exec php -l {} \;
@@ -111,3 +112,14 @@ Admin paneli → Kullanıcılar üzerinden yeni hesap eklenir; her hesabın tür
 Küçük çocuk seçilince sekiz günlük görev içeren kişisel program ve onaycı ebeveyn belirlenir. Kullanıcı kartındaki Günlük program ekranından görev adı, simge, başlangıç, bitiş ve puan değiştirilebilir; görev eklenip kaldırılabilir. Saatler Europe/Istanbul'a göre her gün tekrar eder, cron gerekmez. Varsayılanlar: 07:00 yatak, 08:00 kahvaltı, 08:30 diş, 12:00 oyun, 18:00 oyuncaklar, 19:30 pijama, 20:00 diş, 20:30 yatak. Sabah görevleri 12:00, oyun 18:00, akşam görevleri 23:00'te kapanır. Her biri başlangıçta 10 puandır.
 
 Çocuk yalnızca günlük mektuplarını görür. Zarf açılınca renkli görev kartı çıkar; Yaptım seçili ebeveyne onay gönderir ve sıradaki uygun göreve geçer. Çark/ödül/onaylama işlemleri bu hesap türünde sunucuda da engellenir. Puan yalnızca ebeveyn onayıyla yazılır. Bitiş saatinden sonra gönderilemez; zamanında gönderilmiş görev daha sonra onaylanabilir. Çift tıklama tek kayıt oluşturur. Sonradan program düzenlemek gönderilmiş görevin puanını veya süresini değiştirmez. Hareket azaltma tercihi animasyonu kapatır. Mektup açma durumu yalnızca o sayfa oturumundadır; görev geçmişi veritabanında saklanır.
+
+
+## Çocuk günlük görevleri ve ebeveyn takip paneli
+
+Çocuk hesabında **Günlük görevler** menüsü ve kişisel sayfadan kısayol bulunur; çark ve ödüller de kullanılabilir. Küçük çocuk hesabı mektup ekranını kullanmaya devam eder. Her iki türün günlük programı Admin → Kullanıcılar → Günlük program üzerinden düzenlenir. Günlük görevler seçili ebeveyne (atanmamışsa admin ebeveyne) onaya gider; normal görev tamamlama uç noktası bu onaycı kuralını değiştiremez.
+
+Ebeveyn ve admin hesaplarında **Çocuk takibi** menüsü bulunur. Gün veya hafta (Pazartesi–Pazar), tarih, çocuk ve günlük program/çark filtresi seçilebilir. Rapor her görev için onaylı/toplam, bekleyen, devam eden, süresi dolan/iptal edilen sayılarını ve başarı yüzdesini gösterir. Sabah/akşam aynı adlı görevler saatleriyle ayırt edilir. Rapor yalnızca ebeveynlere sunulur; bu erişim admin düzenleme yetkisi vermez.
+
+Günlük başarı = onaylanan / başlangıç saati gelmiş planlı görev sayısı. Gönderilmeyen ve süresi dolan görevler de paydada yer alır. Gelecek günler ve henüz başlamamış görevler dahil edilmez; hiç görev yoksa yüzde yerine çizgi gösterilir. Bekleyen onaylar başarı sayılmaz. Haftalık toplam, görev sayıları üzerinden hesaplanır; günlük yüzdelerin basit ortalaması alınmaz. Sonradan onaylanan kayıt asıl görev gününe yazılır. Çark raporu ayrı olarak seçili tarihte alınmış görevleri izler; haftalık/aylık görevin hâlâ devam ettiği ayrıca görünür.
+
+Sürüm 8 ilk okumada takip başlangıcını veritabanına bir kez kaydeder. Günlük program değişiklikleri bugünden itibaren uygulanır ve tarihli sürümler halinde tutulur; geçmiş günlerin programı değişmez. İlk takip başlamadan önce süresi bitmiş görevler paydada sayılmaz. Önceki sürümde hiç kaydedilmeyen günler için başarısızlık uydurulmaz; eski günlerde yalnızca var olan görev kayıtları gösterilir ve takip başlangıcı panelde açıklanır. Gönderilmiş görevler düzenleme/silmeden sonra da raporda kalır. Çıkarılan çocuklar raporda Arşiv etiketiyle incelenebilir.

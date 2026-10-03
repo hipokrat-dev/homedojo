@@ -38,14 +38,15 @@ function authorize_action(array $s,array $actor,string $action,array &$in): void
 }
 function member_snapshot(array $s,array $actor): array {
     $v=snapshot($s);$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];
-    foreach($v['users'] as &$u){unset($u['passwordHash'],$u['authVersion']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
+    foreach($v['users'] as &$u){unset($u['passwordHash'],$u['authVersion'],$u['routineHistory'],$u['routineTrackingSince'],$u['routineTrackingAt']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
     $v['assignments']=array_values(array_filter($v['assignments'],fn($a)=>$a['userId']===$actor['id']||($a['reviewerId']??null)===$actor['id']));
     foreach(['completions','redemptions'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($a)=>$a['userId']===$actor['id']));
     if($actor['role']!=='admin')foreach(['tasks','rewards'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($r)=>$key==='tasks'?task_visible_to($r,$actor['id']):$r['ownerId']===$actor['id']));
     $v['archivedUsers']=$actor['role']==='admin'?array_values(array_map(fn($u)=>array_intersect_key($u,array_flip(['id','name','username','avatar','memberType','archivedAt'])),array_filter($v['users'],fn($u)=>!empty($u['archivedAt'])))):[];
     $v['users']=array_values(array_filter($v['users'],fn($u)=>empty($u['archivedAt'])));
     foreach($v['users'] as &$u)if($actor['role']!=='admin'&&$u['id']!==$actor['id'])unset($u['routineSchedule'],$u['guardianId']);unset($u);
-    if(($actor['memberType']??'')==='young_child'){$v['dailyRoutines']=daily_routines($s,$actor);$v['guardianName']=routine_guardian($s,$actor)['name'];}
+    if(has_daily_program($actor)){$v['dailyRoutines']=daily_routines($s,$actor);$v['guardianName']=routine_guardian($s,$actor)['name'];}
+    $v['canViewProgress']=($actor['memberType']??'')==='parent'||$actor['role']==='admin';
     return $v;
 }
 function save_account(array &$s,array $in): void {
@@ -56,16 +57,17 @@ function save_account(array &$s,array $in): void {
     if(($old['role']??'')==='admin'&&$type!=='parent')throw new AppError('Admin hesabı ebeveyn olarak kalmalı.');
     if($type!=='parent')foreach($s['users'] as $u)if(empty($u['archivedAt'])&&($u['guardianId']??'')===$old['id'])throw new AppError('Önce bu ebeveyne bağlı çocukların onaycısını değiştir.');
     $updated=array_merge($old,['username'=>$username,'name'=>valid_text($in['name']??null,'İsim',30),'avatar'=>valid_text($in['avatar']??null,'Simge',12),'memberType'=>$type]);
-    if($type==='young_child'){
+    if(in_array($type,['child','young_child'],true)){
         $guardian=$in['guardianId']??routine_guardian($s,$updated)['id'];$p=$s['users'][active_user_index($s,$guardian,'Ebeveyn')];
         if($p['id']===$old['id']||($p['memberType']??'')!=='parent')throw new AppError('Başka bir ebeveyn seç.');
         $updated['guardianId']=$guardian;$updated['routineSchedule'] ??= default_routines();
     }else unset($updated['guardianId']);
     if(($in['password']??'')!==''){$updated['passwordHash']=password_hash(account_password($in['password']),PASSWORD_DEFAULT);$updated['authVersion']=($old['authVersion']??1)+1;}
+    if(($old['memberType']??'')!==$type||!isset($updated['routineHistory']))record_routine_program($updated);
     $s['users'][$i]=$updated;
     // A newly selected guardian receives pending routine approvals too.
     foreach($s['assignments'] as &$a)if($a['status']==='pending'){
-        if($a['userId']===$old['id']&&isset($a['routineId'])&&$type==='young_child')$a['reviewerId']=$updated['guardianId'];
+        if($a['userId']===$old['id']&&isset($a['routineId'])&&in_array($type,['child','young_child'],true))$a['reviewerId']=$updated['guardianId'];
         elseif(($a['reviewerId']??'')===$old['id']&&$type==='young_child'){
             $replacement=routine_guardian($s,$updated)['id'];
             if($replacement===$a['userId']){$replacement=null;foreach($s['users'] as $p)if(empty($p['archivedAt'])&&$p['id']!==$a['userId']&&$p['memberType']!=='young_child'){$replacement=$p['id'];break;}}
@@ -81,7 +83,7 @@ function create_account(array &$s,array $in): void {
 function archive_account(array &$s,array $actor,array $in): void {
     $i=active_user_index($s,$in['id']??null);$u=$s['users'][$i];
     if($u['id']===$actor['id']||($u['role']??'')==='admin')throw new AppError('Admin hesabı çıkarılamaz.',409);
-    $at=now_tr()->format(DateTimeInterface::ATOM);$s['users'][$i]['archivedAt']=$at;$s['users'][$i]['authVersion']=($u['authVersion']??1)+1;
+    $at=now_tr()->format(DateTimeInterface::ATOM);$s['users'][$i]['archivedAt']=$at;record_routine_program($s['users'][$i]);$s['users'][$i]['authVersion']=($u['authVersion']??1)+1;
     foreach($s['users'] as &$child)if(($child['guardianId']??'')===$u['id'])$child['guardianId']=$actor['id'];unset($child);
     foreach($s['assignments'] as &$a){
         if($a['userId']===$u['id']&&in_array($a['status'],['active','pending'],true)){$a['status']='cancelled';$a['cancelledAt']=$at;}
@@ -93,7 +95,7 @@ function archive_account(array &$s,array $actor,array $in): void {
     }unset($a);
 }
 function restore_account(array &$s,array $in): void {
-    $i=find_index($s['users'],$in['id']??null,'Kullanıcı');if(empty($s['users'][$i]['archivedAt']))throw new AppError('Bu kullanıcı zaten aktif.',409);unset($s['users'][$i]['archivedAt']);$s['users'][$i]['authVersion']=($s['users'][$i]['authVersion']??1)+1;
+    $i=find_index($s['users'],$in['id']??null,'Kullanıcı');if(empty($s['users'][$i]['archivedAt']))throw new AppError('Bu kullanıcı zaten aktif.',409);unset($s['users'][$i]['archivedAt']);record_routine_program($s['users'][$i]);$s['users'][$i]['authVersion']=($s['users'][$i]['authVersion']??1)+1;
 }
 
 function self_user_index(array $s,array $actor,array $in): int {

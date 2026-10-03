@@ -113,6 +113,13 @@ try{
  use(admin);assert.equal((await request('archiveAccount',{id:littleId})).status,200);use(little);assert.equal((await request('state')).status,401);
  cookie='';csrf=(await request('session')).body.csrf;assert.equal((await request('login',{username:'little_test',password:'little-fixture-password'})).status,422);
  use(admin);const restored=await request('restoreAccount',{id:littleId});assert.equal(restored.status,200);assert.ok(restored.body.state.users.some(u=>u.id===littleId));assert.equal((await request('archiveAccount',{id:'u1'})).status,409);
+ // Older children can submit daily routines; only parents can inspect progress.
+ use(other);const older=(await request('state')).body.state;assert.ok(older.dailyRoutines.length>0);assert.equal(older.canViewProgress,false);assert.equal((await request('progress&mode=week&date='+older.today)).status,403);
+ use(admin);assert.equal((await request('saveRoutines',{id:'u3',routines:[{id:'older-day',title:'Older daily task',icon:'📚',time:'00:00',until:'23:59',points:20}]})).status,200);
+ use(other);const olderPlan=(await request('state')).body.state;if(olderPlan.dailyRoutines[0].status==='active'){assert.equal((await request('completeRoutine',{routineId:'older-day',day:olderPlan.today})).status,200);}
+ use(admin);const progress=await request('progress&mode=week&date='+olderPlan.today+'&childId=u3&source=daily');assert.equal(progress.status,200);assert.equal(progress.body.report.rows.length,1);assert.equal(progress.body.report.rows[0].userId,'u3');assert.ok(!JSON.stringify(progress.body).includes('passwordHash'));assert.equal((await request('progress&date=2026-02-30')).status,400);
+ const anne=(await request('state')).body.state.users.find(u=>u.id==='u2');assert.equal((await request('saveAccount',{id:'u2',name:anne.name,username:anne.username,avatar:anne.avatar,memberType:'parent'})).status,200);
+ cookie='';csrf=(await request('session')).body.csrf;const parentLogin=await request('login',{username:'member2',password:'new-fixture-password'});assert.equal(parentLogin.status,200);csrf=parentLogin.body.csrf;assert.equal((await request('progress&mode=day&date='+olderPlan.today)).status,200,'Nonadmin parent can inspect progress');assert.equal((await request('saveRoutines',{id:'u3',routines:[]})).status,403,'Report access does not grant admin rights');
  use(admin);assert.equal((await request('setupAccounts',{adminId:'u1',accounts})).status,409);
  assert.equal((await request('logout',{})).status,200);assert.equal((await request('state')).status,401);
  console.log('✓ HTTP personal login, migration, roles, ownership, privacy, CSRF, session rotation/revocation, concurrent draws/submissions/approvals, frozen points, reward debit and family scoring passed.');

@@ -3,6 +3,7 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');
 require_once __DIR__.'/../app/bootstrap.php';
 require_once __DIR__.'/../app/accounts.php';
+require_once __DIR__.'/../app/progress.php';
 try{
     $config=configuration();session_start_safe();$action=$_GET['action']??'state';$method=$_SERVER['REQUEST_METHOD'];
     $development=($config['environment']??'production')==='development';
@@ -58,6 +59,7 @@ try{
     }
     $session=$_SESSION;$csrf=$_SESSION['csrf'];session_write_close();
     if($action==='state')json_response(['state'=>member_snapshot($current,$actor),'csrf'=>$csrf]);
+    if($action==='progress')json_response(['report'=>child_progress($current,$actor,$_GET)]);
     $result=[];
     $current=$store->update(function(array &$s)use($action,$input,$session,&$result){
         $actor=actor_for($s,$session);if(!$actor)throw new AppError('Oturum sona erdi.',401);
