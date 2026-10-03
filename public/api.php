@@ -4,11 +4,12 @@ header('Content-Type: application/json; charset=utf-8');header('Cache-Control: n
 require_once __DIR__.'/../app/bootstrap.php';
 require_once __DIR__.'/../app/accounts.php';
 require_once __DIR__.'/../app/progress.php';
+require_once __DIR__.'/../app/wishes.php';
 try{
     $config=configuration();session_start_safe();$action=$_GET['action']??'state';$method=$_SERVER['REQUEST_METHOD'];
     $development=($config['environment']??'production')==='development';
     if(!$development&&empty($config['password_hash']))throw new RuntimeException('Password is required in production.');
-    $writes=['login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem','cancelAssignment','createCompetition','cancelCompetition','claimCompetition','setupAccounts','saveAccount','reviewAssignment','savePhoto','changeCredentials','createAccount','archiveAccount','restoreAccount','saveRoutines','completeRoutine'];
+    $writes=['requestReward','reviewRewardRequest','cancelRewardRequest','login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem','cancelAssignment','createCompetition','cancelCompetition','claimCompetition','setupAccounts','saveAccount','reviewAssignment','savePhoto','changeCredentials','createAccount','archiveAccount','restoreAccount','saveRoutines','completeRoutine'];
     if(in_array($action,$writes,true)){
         if($method!=='POST')throw new AppError('Bu işlem POST gerektirir.',405);
         if(($_SERVER['HTTP_SEC_FETCH_SITE']??'')==='cross-site')throw new AppError('Bu kaynaktan işlem yapılamaz.',403);
@@ -65,6 +66,7 @@ try{
         $actor=actor_for($s,$session);if(!$actor)throw new AppError('Oturum sona erdi.',401);
         authorize_action($s,$actor,$action,$input);
         if($action==='spin')$result=spin($s,$actor['id'],valid_text($input['frequency']??'all','Dönem',10),valid_request($input['requestId']??null));
+        elseif(in_array($action,['requestReward','reviewRewardRequest','cancelRewardRequest'],true))reward_wish($s,$actor,$action,$input);
         elseif($action==='saveAccount')save_account($s,$input);
         elseif($action==='createAccount')create_account($s,$input);
         elseif($action==='archiveAccount')archive_account($s,$actor,$input);

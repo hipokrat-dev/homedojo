@@ -127,3 +127,8 @@ Sürüm 8 ilk okumada takip başlangıcını veritabanına bir kez kaydeder. Gü
 
 
 Canlı alan adı `https://yapeglen.com` adresidir. Üretim için genel adres ayarı `app/site.php` dosyasından alınır; özel veritabanı ayarları değiştirilmez. Alan adı değişirse bu dosya yeni HTTPS adresiyle güncellenmelidir. Origin ve CSRF doğrulaması korunur. Geliştirme ortamında yerel `public_url` kullanılır.
+
+### Çocuktan ebeveyne ödül isteği
+Çocuk, Ödül istekleri ekranından bir ebeveyn seçerek hayalindeki ödülü gönderir. Seçilen ebeveyn (veya admin) puan belirleyip onaylar ya da notuyla geri çevirir. Onay, kişisel ödülü ve aktif hedefi oluşturur; puan kazandırmaz. Çocuk görev onaylarıyla puan toplar ve yeterli bakiyede mevcut ödül akışını kullanır. Bekleyen istek geri çekilebilir; en fazla beş istek bekleyebilir. Ses tercihi çarkla ortaktır; hareket azaltma tercihi efektlerde korunur.
+
+Doğrulama: `php tests/wishes.php`, `node tests/http.mjs`.

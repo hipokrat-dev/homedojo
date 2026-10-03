@@ -120,6 +120,16 @@ try{
  use(admin);const progress=await request('progress&mode=week&date='+olderPlan.today+'&childId=u3&source=daily');assert.equal(progress.status,200);assert.equal(progress.body.report.rows.length,1);assert.equal(progress.body.report.rows[0].userId,'u3');assert.ok(!JSON.stringify(progress.body).includes('passwordHash'));assert.equal((await request('progress&date=2026-02-30')).status,400);
  const anne=(await request('state')).body.state.users.find(u=>u.id==='u2');assert.equal((await request('saveAccount',{id:'u2',name:anne.name,username:anne.username,avatar:anne.avatar,memberType:'parent'})).status,200);
  cookie='';csrf=(await request('session')).body.csrf;const parentLogin=await request('login',{username:'member2',password:'new-fixture-password'});assert.equal(parentLogin.status,200);csrf=parentLogin.body.csrf;assert.equal((await request('progress&mode=day&date='+olderPlan.today)).status,200,'Nonadmin parent can inspect progress');assert.equal((await request('saveRoutines',{id:'u3',routines:[]})).status,403,'Report access does not grant admin rights');
+ // Child reward requests: nonadmin parent pricing, concurrent review and privacy.
+ const wishParent={cookie,csrf};use(other);
+ const wishInput={requestId:'wish-http-request-12345',title:'Aile sineması',icon:'🎬',parentId:'u2',cost:1,childId:'u4'};
+ assert.equal((await request('requestReward',wishInput,{'X-CSRF-Token':'bad'})).status,403);
+ const wishes=await Promise.all([request('requestReward',wishInput),request('requestReward',wishInput)]);assert.deepEqual(wishes.map(r=>r.status),[200,200]);
+ const wish=wishes[1].body.state.rewardWishes[0];assert.equal(wish.childId,'u3');assert.equal(wishes[1].body.state.rewardWishes.length,1);
+ assert.equal((await request('reviewRewardRequest',{id:wish.id,decision:'approve',cost:1})).status,403);
+ use(wishParent);assert.equal((await request('state')).body.state.rewardWishes[0].id,wish.id);
+ const reviews=await Promise.all([request('reviewRewardRequest',{id:wish.id,decision:'approve',cost:250}),request('reviewRewardRequest',{id:wish.id,decision:'approve',cost:250})]);assert.deepEqual(reviews.map(r=>r.status).sort(),[200,409]);
+ use(other);const wishState=(await request('state')).body.state;assert.equal(wishState.rewardWishes[0].status,'approved');assert.equal(wishState.users.find(u=>u.id==='u3').goal.cost,250);assert.equal(wishState.rewards.filter(r=>r.wishId===wish.id).length,1);
  use(admin);assert.equal((await request('setupAccounts',{adminId:'u1',accounts})).status,409);
  assert.equal((await request('logout',{})).status,200);assert.equal((await request('state')).status,401);
  console.log('✓ HTTP personal login, migration, roles, ownership, privacy, CSRF, session rotation/revocation, concurrent draws/submissions/approvals, frozen points, reward debit and family scoring passed.');

@@ -7,6 +7,7 @@ function upgrade_state(array $state): array {
     // Additive migration: never overwrite profiles, scores, tasks or reward history.
     $state['assignments'] ??= [];
     $state['competitions'] ??= [];
+    $state['rewardWishes'] ??= [];
     // Split legacy shared templates into independently editable personal copies.
     $maps=['tasks'=>[],'rewards'=>[]];
     foreach(['tasks','rewards'] as $kind){
