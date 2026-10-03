@@ -7,6 +7,44 @@ const colors=['#aa91fb','#efacd3','#f2ca8a','#a9d7b9'];
 const names={account:'Profil ayarları',admin:'Admin paneli',approvals:'Onaylar',home:'Aile panosu',profile:'Sayfam',competitions:'Yarışmalar',tasks:'Görevler',wheel:'Çarkıfelek',rewards:'Ödüller',history:'Hareketler',settings:'Ayarlar'};
 const periods={daily:'1 gün',weekly:'1 hafta',monthly:'1 ay'};
 let setupMode=false, adminTab='tasks', adminPerson='', state, csrf='', selected=localStorage.getItem('homedojo-profile')||'u1', page='home', filter='all', busy=false, spinning=false, wheelAngle=0, wheelTasks=[], toastTimer, refreshTimer, clockOffset=0, wheelFilter='all';
+// Audio starts only after a user gesture; unsupported browsers keep the wheel silent.
+const wheelSound=(()=>{
+ let enabled=true,context,frame=0,nodes=new Set();
+ try{enabled=localStorage.getItem('homedojo-wheel-sound')!=='off';}catch{}
+ function unlock(){
+  if(!enabled)return;
+  try{const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;context ||= new Audio();if(context.state==='suspended')context.resume().catch(()=>{});}catch{}
+ }
+ function tone(frequency,delay=0,length=.035,volume=.075){
+  if(!enabled||document.hidden||context?.state!=='running')return;
+  try{
+   const oscillator=context.createOscillator(),gain=context.createGain(),start=context.currentTime+delay;
+   oscillator.type='sine';oscillator.frequency.setValueAtTime(frequency,start);oscillator.frequency.exponentialRampToValueAtTime(frequency*.55,start+length);
+   gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(volume,start+.003);gain.gain.exponentialRampToValueAtTime(.0001,start+length);
+   oscillator.connect(gain);gain.connect(context.destination);nodes.add(oscillator);
+   oscillator.onended=()=>{nodes.delete(oscillator);oscillator.disconnect();gain.disconnect();};oscillator.start(start);oscillator.stop(start+length+.01);
+  }catch{}
+ }
+ function stop(){cancelAnimationFrame(frame);frame=0;for(const node of nodes){try{node.stop();}catch{}}nodes.clear();}
+ function follow(element,count){
+  stop();let previous=null,travel=0,lastTick=-Infinity;const step=360/count;
+  function tick(now){
+   if(document.hidden||!element.isConnected){stop();return;}
+   const transform=getComputedStyle(element).transform;
+   const matrix=new DOMMatrixReadOnly(transform==='none'?undefined:transform),angle=Math.atan2(matrix.b,matrix.a)*180/Math.PI;
+   if(previous!==null){const delta=(angle-previous+540)%360-180,old=Math.floor(travel/step);travel+=Math.max(0,delta);if(Math.floor(travel/step)>old&&now-lastTick>=45){tone(1500);lastTick=now;}}
+   previous=angle;frame=requestAnimationFrame(tick);
+  }
+  // Seed the angle before the first animation frame so fast initial movement is included.
+  tick(performance.now());
+ }
+ function finish(){stop();[660,880,1320].forEach((note,i)=>tone(note,i*.11,.24,.065));}
+ function toggle(){enabled=!enabled;try{localStorage.setItem('homedojo-wheel-sound',enabled?'on':'off');}catch{}if(enabled)unlock();else for(const node of nodes){try{node.stop();}catch{}}return enabled;}
+ return{unlock,follow,finish,stop,toggle,get enabled(){return enabled;}};
+})();
+function soundButton(){return `<span aria-hidden="true">${wheelSound.enabled?'♫':'♪'}</span> Ses ${wheelSound.enabled?'açık':'kapalı'}`;}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)wheelSound.stop();});
+window.addEventListener('pagehide',()=>wheelSound.stop());
 const user=()=>state.users.find(u=>u.id===selected)||state.users[0];
 const number=n=>n.toLocaleString('tr-TR');
 async function api(action,data){
@@ -47,7 +85,7 @@ function wheelPanel(immersive=false){
   <div class="wheel-head"><div class="eyebrow">BİRAZ ŞANS · BÜYÜK BİR BAŞLANGIÇ</div><h2>Bugünün sürprizi <span>çarkta.</span></h2><p>${user().goal?`🎯 ${esc(user().goal.title)} için bir adım daha`:state.familyGoal?`🏆 Ortak hedef: ${esc(state.familyGoal.prize)}`:'Önce hayalindeki ödülü seç, macera başlasın.'}</p></div>
   <div class="tabs wheel-tabs" role="group" aria-label="Çark görev dönemi">${[['all','Karışık'],...Object.entries(periods)].map(([k,v])=>`<button data-wheel-filter="${k}" class="${wheelFilter===k?'active':''}" aria-pressed="${wheelFilter===k}">${v}</button>`).join('')}</div>
   <div class="wheel-wrap"><div class="wheel-aura" aria-hidden="true"></div><div class="wheel-orbit" aria-hidden="true"></div><span class="wheel-spark s1" aria-hidden="true">✦</span><span class="wheel-spark s2" aria-hidden="true">✧</span><span class="wheel-spark s3" aria-hidden="true">✦</span><div class="wheel-rim"></div><div class="wheel-lights" aria-hidden="true">${Array.from({length:48},(_,i)=>`<i style="--i:${i}"></i>`).join('')}</div><div class="wheel" id="wheel"><canvas id="wheel-canvas" width="1200" height="1200" aria-label="Görev adları ve puanlarını gösteren çark"></canvas></div><div class="wheel-center" aria-hidden="true"><span>✦</span><small>HOME<br>DOJO</small></div><div class="pointer" aria-hidden="true"></div></div>
-  <div class="wheel-controls"><div id="wheel-result" class="wheel-result" role="status">${tasks.length?`<span class="live-dot"></span> ${tasks.length} görev · Bir sonraki başarı senin`:'Bu dönemde seçilebilecek görev kalmadı.'}</div><button class="primary spin-button" data-action="spin" ${!tasks.length||(!user().goal&&!state.familyGoal)?'disabled':''}>${icon('wheel')} <span>Çarkı çevir</span> ${icon('arrow')}</button>${!user().goal&&!state.familyGoal?'<button class="text-button wheel-choose-goal" data-nav="rewards">Hedef ödülünü seç →</button>':''}<p class="wheel-note">Çevir. Görevini keşfet. Zamanında tamamla, puanını kazan.</p></div>
+  <div class="wheel-controls"><button class="wheel-sound" data-action="toggle-sound" aria-label="Çark sesi" aria-pressed="${wheelSound.enabled}">${soundButton()}</button><div id="wheel-result" class="wheel-result" role="status">${tasks.length?`<span class="live-dot"></span> ${tasks.length} görev · Bir sonraki başarı senin`:'Bu dönemde seçilebilecek görev kalmadı.'}</div><button class="primary spin-button" data-action="spin" ${!tasks.length||(!user().goal&&!state.familyGoal)?'disabled':''}>${icon('wheel')} <span>Çarkı çevir</span> ${icon('arrow')}</button>${!user().goal&&!state.familyGoal?'<button class="text-button wheel-choose-goal" data-nav="rewards">Hedef ödülünü seç →</button>':''}<p class="wheel-note">Çevir. Görevini keşfet. Zamanında tamamla, puanını kazan.</p></div>
   <details class="wheel-legend"><summary>Çarktaki görevleri keşfet · ${tasks.length}</summary><ol>${tasks.map(t=>`<li><span>${esc(t.icon)} ${esc(t.title)}</span><strong>+${number(t.points)}</strong></li>`).join('')||'<li>Görev ekleyebilir veya başka bir dönem seçebilirsin.</li>'}</ol></details>
  </section>`;
 }
@@ -172,6 +210,7 @@ function confirmDelete(kind,id){const value=(kind==='task'?state.tasks:state.rew
 function confirmReward(id){const r=state.rewards.find(x=>x.id===id);const requestId=crypto.randomUUID();openModal('Bu ödül senin olsun! 🎉',`<p><strong>${esc(r.title)}</strong> için ${number(r.cost)} puan kullanacaksın. Kalan puanın: <strong>${number(user().balance-r.cost)}</strong>.</p><div class="form-error" role="alert"></div><div class="modal-actions"><button class="secondary" data-close>Biraz daha biriktir</button><button class="primary" id="confirm-redeem">${icon('gift')} Ödülü al</button></div>`);$('#confirm-redeem').onclick=()=>commit('redeem',{userId:selected,rewardId:id,requestId},`${r.title} senin! Güle güle kullan. 🎁`);}
 async function spinWheel(){
  if(spinning||busy)return;
+ wheelSound.unlock();
  if(page!=='wheel'){page='wheel';render();window.scrollTo({top:0,behavior:'instant'});}
  spinning=true;const button=$('[data-action="spin"]'),panel=$('.wheel-panel');
  button.disabled=true;button.innerHTML=`${icon('spark')} <span>Görevin seçiliyor…</span>`;
@@ -181,19 +220,20 @@ async function spinWheel(){
   const index=result.candidates.findIndex(t=>t.id===result.task.id),step=360/result.candidates.length,target=(360-(index+.5)*step)%360;
   const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
   panel.classList.add('is-spinning');$('#wheel-result').textContent='Şansın dönüyor… Sıradaki başarıya hazır mısın?';button.innerHTML=`${icon('wheel')} <span>Şansın dönüyor…</span>`;
+  if(!reduced)wheelSound.follow($('#wheel'),result.candidates.length);
   wheelAngle+=360*7+(target-wheelAngle%360+360)%360;void $('#wheel').offsetWidth;$('#wheel').style.transition='';$('#wheel').style.transform=`rotate(${wheelAngle}deg)`;
   await new Promise(r=>setTimeout(r,reduced?50:5900));
-  panel.classList.remove('is-spinning');panel.classList.add('is-revealed');drawWheel(result.candidates,result.task.id);
+  wheelSound.finish();panel.classList.remove('is-spinning');panel.classList.add('is-revealed');drawWheel(result.candidates,result.task.id);
   $('#wheel-result').innerHTML=`${esc(result.task.icon)} ${esc(result.task.title)} <strong>+${number(result.task.points)} puan</strong>`;button.innerHTML=`${icon('check')} <span>Görevin hazır!</span>`;celebrate();
   await new Promise(r=>setTimeout(r,reduced?50:1000));
   page='profile';render();window.scrollTo({top:0,behavior:'instant'});
   openModal('Yeni görevin geldi! 🎉',`<div class="spin-prize"><span>${esc(result.task.icon)}</span><h3>${esc(result.task.title)}</h3><strong>+${number(result.task.points)} <small>puan</small></strong></div><p>${esc(result.task.description)}<br><br><strong>${periods[result.task.frequency]} görev</strong> · Son tarih: ${formatDeadline(result.assignment.dueAt)}<br>Görevin kişisel sayfana kaydedildi. Zamanında tamamla, ödülüne yaklaş!</p><div class="modal-actions"><button class="primary" data-close>Görevimi gör ${icon('arrow')}</button></div>`);
- }catch(e){toast(e.message);await reloadState(false);}
- finally{spinning=false;if(button.isConnected)render();}
+ }catch(e){wheelSound.stop();toast(e.message);await reloadState(false);}
+ finally{wheelSound.stop();spinning=false;if(button.isConnected)render();}
 }
 function switchUser(){page='profile';render();}
 root.addEventListener('change',e=>{if(e.target.id==='admin-person'){adminPerson=e.target.value;render();}});
-root.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b||spinning||busy)return;const d=b.dataset;if(b.hasAttribute('data-remove-photo'))commit('savePhoto',{remove:true},'Profil fotoğrafın kaldırıldı.');else if(d.adminTab){adminTab=d.adminTab;render();}else if(d.editAccount)accountEditor(d.editAccount);else if(d.review)commit('reviewAssignment',{assignmentId:d.review,decision:d.decision},d.decision==='approve'?'Onaylandı. Puan eklendi.':'Görev geri gönderildi.');else if(d.nav){e.preventDefault();page=d.nav;render();window.scrollTo({top:0,behavior:'smooth'});}else if(d.user)switchUser(d.user);else if(d.filter){filter=d.filter;render();}else if(d.wheelFilter){wheelFilter=d.wheelFilter;render();}else if(d.goal)commit('selectGoal',{userId:selected,rewardId:d.goal},'Hedefin kaydedildi. Şimdi çarkı çevir! 🎯');else if(d.cancelAssignment)confirmFamilyAction('cancelAssignment',d.cancelAssignment);else if(d.cancelCompetition)confirmFamilyAction('cancelCompetition',d.cancelCompetition);else if(d.claimCompetition)confirmFamilyAction('claimCompetition',d.claimCompetition);else if(d.complete)submitForReview(d.complete);else if(d.editTask)editor('task',d.editTask);else if(d.deleteTask)confirmDelete('task',d.deleteTask);else if(d.editReward)editor('reward',d.editReward);else if(d.deleteReward)confirmDelete('reward',d.deleteReward);else if(d.editUser)editor('user',d.editUser);else if(d.redeem)confirmReward(d.redeem);else if(d.action==='new-competition')competitionEditor();else if(d.action==='new-task')editor('task');else if(d.action==='new-reward')editor('reward');else if(d.action==='spin')spinWheel();else if(d.action==='logout'){api('logout',{}).then(()=>{state=null;init();}).catch(e=>toast(e.message));}else if(d.action==='profiles'){openModal('Bugün kim oynuyor?',`<div style="display:grid;gap:10px">${state.users.map(u=>`<button class="secondary" data-switch="${u.id}">${esc(u.avatar)} ${esc(u.name)} · ${number(u.balance)} puan</button>`).join('')}</div>`);}});
+root.addEventListener('click',e=>{const b=e.target.closest('button,a');if(!b)return;if(b.dataset.action==='toggle-sound'){wheelSound.toggle();b.innerHTML=soundButton();b.setAttribute('aria-pressed',String(wheelSound.enabled));return;}if(spinning||busy)return;const d=b.dataset;if(b.hasAttribute('data-remove-photo'))commit('savePhoto',{remove:true},'Profil fotoğrafın kaldırıldı.');else if(d.adminTab){adminTab=d.adminTab;render();}else if(d.editAccount)accountEditor(d.editAccount);else if(d.review)commit('reviewAssignment',{assignmentId:d.review,decision:d.decision},d.decision==='approve'?'Onaylandı. Puan eklendi.':'Görev geri gönderildi.');else if(d.nav){e.preventDefault();page=d.nav;render();window.scrollTo({top:0,behavior:'smooth'});}else if(d.user)switchUser(d.user);else if(d.filter){filter=d.filter;render();}else if(d.wheelFilter){wheelFilter=d.wheelFilter;render();}else if(d.goal)commit('selectGoal',{userId:selected,rewardId:d.goal},'Hedefin kaydedildi. Şimdi çarkı çevir! 🎯');else if(d.cancelAssignment)confirmFamilyAction('cancelAssignment',d.cancelAssignment);else if(d.cancelCompetition)confirmFamilyAction('cancelCompetition',d.cancelCompetition);else if(d.claimCompetition)confirmFamilyAction('claimCompetition',d.claimCompetition);else if(d.complete)submitForReview(d.complete);else if(d.editTask)editor('task',d.editTask);else if(d.deleteTask)confirmDelete('task',d.deleteTask);else if(d.editReward)editor('reward',d.editReward);else if(d.deleteReward)confirmDelete('reward',d.deleteReward);else if(d.editUser)editor('user',d.editUser);else if(d.redeem)confirmReward(d.redeem);else if(d.action==='new-competition')competitionEditor();else if(d.action==='new-task')editor('task');else if(d.action==='new-reward')editor('reward');else if(d.action==='spin')spinWheel();else if(d.action==='logout'){api('logout',{}).then(()=>{state=null;init();}).catch(e=>toast(e.message));}else if(d.action==='profiles'){openModal('Bugün kim oynuyor?',`<div style="display:grid;gap:10px">${state.users.map(u=>`<button class="secondary" data-switch="${u.id}">${esc(u.avatar)} ${esc(u.name)} · ${number(u.balance)} puan</button>`).join('')}</div>`);}});
 modal.addEventListener('click',e=>{if(busy)return;const close=e.target.closest('[data-close]'),profile=e.target.closest('[data-switch]');if(close)modal.close();if(profile)switchUser(profile.dataset.switch);if(e.target===modal){const r=modal.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)modal.close();}});
 modal.addEventListener('cancel',e=>{if(busy)e.preventDefault();});
 function showLogin(){
