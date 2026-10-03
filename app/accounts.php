@@ -47,6 +47,7 @@ function member_snapshot(array $s,array $actor): array {
     foreach($v['users'] as &$u)if($actor['role']!=='admin'&&$u['id']!==$actor['id'])unset($u['routineSchedule'],$u['guardianId']);unset($u);
     if(has_daily_program($actor)){$v['dailyRoutines']=daily_routines($s,$actor);$v['guardianName']=routine_guardian($s,$actor)['name'];}
     $v['rewardWishes']=array_values(array_filter($v['rewardWishes']??[],fn($w)=>$w['childId']===$actor['id']||(($actor['memberType']??'')==='parent'&&($w['parentId']===$actor['id']||$actor['role']==='admin'))));
+    $v['parentDailyRoutines']=parent_daily_routines($s,$actor);
     $v['canViewProgress']=($actor['memberType']??'')==='parent'||$actor['role']==='admin';
     return $v;
 }

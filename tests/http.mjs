@@ -138,6 +138,12 @@ try{
   use(admin);assert.equal((await request('reviewAssignment',{assignmentId:lateTask.id,decision:'approve'})).status,200);
  }
  use(lateTestParent);
+ // The nonadmin mother observes a task directly; concurrent approvals award once.
+ const observingParent={cookie,csrf};use(admin);assert.equal((await request('saveRoutines',{id:'u3',routines:[{id:'observe-day',title:'Observed task',icon:'🛏️',time:'00:00',until:'23:59',points:19}]})).status,200);
+ use(other);assert.equal((await request('parentApproveRoutine',{childId:'u3',routineId:'observe-day',day:olderPlan.today})).status,403);assert.deepEqual((await request('state')).body.state.parentDailyRoutines,[]);
+ use(observingParent);const parentView=(await request('state')).body.state;assert.ok(parentView.parentDailyRoutines.some(c=>c.id==='u3'));assert.ok(!JSON.stringify(parentView.parentDailyRoutines).includes('passwordHash'));
+ const observed=await Promise.all([request('parentApproveRoutine',{childId:'u3',routineId:'observe-day',day:parentView.today}),request('parentApproveRoutine',{childId:'u3',routineId:'observe-day',day:parentView.today})]);assert.deepEqual(observed.map(r=>r.status),[200,200]);
+ use(other);const observedState=(await request('state')).body.state;assert.equal(observedState.completions.filter(c=>c.taskId==='routine-observe-day').length,1);use(observingParent);
  // Child reward requests: nonadmin parent pricing, concurrent review and privacy.
  const wishParent={cookie,csrf};use(other);
  const wishInput={requestId:'wish-http-request-12345',title:'Aile sineması',icon:'🎬',parentId:'u2',cost:1,childId:'u4'};

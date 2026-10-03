@@ -51,3 +51,13 @@ $p=$scenario['users'][1];save_account($scenario,['id'=>'u2','name'=>$p['name'],'
 $work=$scenario['assignments'][find_index($scenario['assignments'],$work['id'],'A')];check($work['reviewerId']!=='u1'&&$work['reviewerId']!=='u2','Type change cannot route a review back to its owner');
 $view=member_snapshot($scenario,$scenario['users'][2]);check(!isset($view['users'][1]['routineSchedule']),'Other members cannot inspect child schedules');
 echo "✓ $count membership, daily schedule, approval and archive checks passed.\n";
+
+// A nonadmin parent can observe and approve both child types, even with another guardian.
+$direct=initial_state();$rows=[];foreach($direct['users'] as $j=>$u)$rows[]=['id'=>$u['id'],'name'=>$j===1?'Anne':$u['name'],'username'=>'parenttest'.$j,'password'=>'1234'];setup_accounts($direct,['adminId'=>'u1','accounts'=>$rows]);$mother=$direct['users'][1];$direct['users'][3]['memberType']='young_child';$time=new DateTimeImmutable('2026-10-03T14:00:00+03:00');
+check(count(parent_daily_routines($direct,$mother,$time))===2,'Mother sees both children daily plans');check(parent_daily_routines($direct,$direct['users'][2],$time)===[],'Child cannot receive sibling daily plans');
+$input=['childId'=>'u3','routineId'=>'bed','day'=>'2026-10-03'];denied(function()use(&$direct,$input,$time){parent_approve_routine($direct,$direct['users'][3],$input,$time);},403);
+parent_approve_routine($direct,$mother,$input,$time);parent_approve_routine($direct,$mother,$input,$time);check(balance($direct,'u3')===10&&count($direct['completions'])===1,'Direct parent approval awards once after repeated clicks');check($direct['completions'][0]['approvedBy']==='u2','Actual observing parent recorded');
+complete_routine($direct,$direct['users'][3],['routineId'=>'bed','day'=>'2026-10-03'],$time);parent_approve_routine($direct,$mother,['childId'=>'u4','routineId'=>'bed','day'=>'2026-10-03'],$time);check(balance($direct,'u4')===10,'Mother approves a young child pending with another guardian');
+denied(function()use(&$direct,$mother,$time){parent_approve_routine($direct,$mother,['childId'=>'u3','routineId'=>'sleep','day'=>'2026-10-03'],$time);},409);
+denied(function()use(&$direct,$mother,$time){parent_approve_routine($direct,$mother,['childId'=>'u3','routineId'=>'bed','day'=>'2026-10-02'],$time);},409);
+echo "✓ Parent daily overview, observation, role boundaries and duplicate award protection passed.\n";

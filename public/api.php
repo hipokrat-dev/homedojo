@@ -9,7 +9,7 @@ try{
     $config=configuration();session_start_safe();$action=$_GET['action']??'state';$method=$_SERVER['REQUEST_METHOD'];
     $development=($config['environment']??'production')==='development';
     if(!$development&&empty($config['password_hash']))throw new RuntimeException('Password is required in production.');
-    $writes=['requestReward','reviewRewardRequest','cancelRewardRequest','login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem','cancelAssignment','createCompetition','cancelCompetition','claimCompetition','setupAccounts','saveAccount','reviewAssignment','savePhoto','changeCredentials','createAccount','archiveAccount','restoreAccount','saveRoutines','completeRoutine'];
+    $writes=['parentApproveRoutine','requestReward','reviewRewardRequest','cancelRewardRequest','login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem','cancelAssignment','createCompetition','cancelCompetition','claimCompetition','setupAccounts','saveAccount','reviewAssignment','savePhoto','changeCredentials','createAccount','archiveAccount','restoreAccount','saveRoutines','completeRoutine'];
     if(in_array($action,$writes,true)){
         if($method!=='POST')throw new AppError('Bu işlem POST gerektirir.',405);
         if(($_SERVER['HTTP_SEC_FETCH_SITE']??'')==='cross-site')throw new AppError('Bu kaynaktan işlem yapılamaz.',403);
@@ -72,6 +72,7 @@ try{
         elseif($action==='archiveAccount')archive_account($s,$actor,$input);
         elseif($action==='restoreAccount')restore_account($s,$input);
         elseif($action==='saveRoutines')save_routines($s,$input);
+        elseif($action==='parentApproveRoutine')parent_approve_routine($s,$actor,$input);
         elseif($action==='completeRoutine')complete_routine($s,$actor,$input);
         elseif($action==='savePhoto')save_photo($s,$actor,$input);
         else{$input['actorId']=$actor['id'];mutate($s,$action,$input);}

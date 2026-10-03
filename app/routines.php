@@ -67,3 +67,27 @@ function complete_routine(array &$s,array $actor,array $in,?DateTimeImmutable $n
     }
     $s['assignments'][$i]=array_merge($s['assignments'][$i],['status'=>'pending','submittedAt'=>$at,'submittedLate'=>$now>=new DateTimeImmutable($r['dueAt']),'reviewerId'=>$guardian['id']]);
 }
+
+function parent_daily_routines(array $s,array $actor,?DateTimeImmutable $now=null): array {
+    if(($actor['memberType']??'')!=='parent')return [];
+    $out=[];foreach($s['users'] as $child)if(empty($child['archivedAt'])&&has_daily_program($child)){
+        $out[]=['id'=>$child['id'],'name'=>$child['name'],'avatar'=>$child['avatar'],'photo'=>$child['photo']??null,'tasks'=>daily_routines($s,$child,$now)];
+    }
+    return $out;
+}
+function parent_approve_routine(array &$s,array $actor,array $in,?DateTimeImmutable $now=null): void {
+    $parent=$s['users'][active_user_index($s,$actor['id'])];
+    if(($parent['memberType']??'')!=='parent')throw new AppError('Bu işlem yalnızca ebeveyn hesabına açık.',403);
+    $child=$s['users'][active_user_index($s,$in['childId']??null,'Çocuk')];
+    if(!has_daily_program($child)||$child['id']===$parent['id'])throw new AppError('Bir çocuk görevi seç.',403);
+    $now=now_tr($now);if(($in['day']??null)!==$now->format('Y-m-d'))throw new AppError('Gün değişti. Sayfayı yenile.',409);
+    $tasks=daily_routines($s,$child,$now);$task=$tasks[find_index($tasks,$in['routineId']??null,'Günlük görev')];
+    if($task['status']==='completed')return;
+    if(!in_array($task['status'],['active','pending'],true))throw new AppError('Bu görev henüz onaylanamaz.',409);
+    complete_routine($s,$child,['day'=>$in['day'],'routineId'=>$task['id']],$now);
+    foreach($s['assignments'] as $i=>$a)if($a['userId']===$child['id']&&($a['routineDay']??null)===$in['day']&&($a['routineId']??null)===$task['id']){
+        $s['assignments'][$i]['observedBy']=$parent['id'];$s['assignments'][$i]['observedAt']=$now->format(DateTimeInterface::ATOM);
+        $s['assignments'][$i]['originalReviewerId'] ??= $a['reviewerId'];$s['assignments'][$i]['reviewerId']=$parent['id'];
+        mutate($s,'reviewAssignment',['assignmentId'=>$a['id'],'actorId'=>$parent['id'],'decision'=>'approve'],$now);return;
+    }
+}
