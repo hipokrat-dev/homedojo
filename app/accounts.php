@@ -51,3 +51,38 @@ function save_account(array &$s,array $in): void {
     $s['users'][$i]['avatar']=valid_text($in['avatar']??null,'Simge',12);
     if(($in['password']??'')!==''){$s['users'][$i]['passwordHash']=password_hash(account_password($in['password']),PASSWORD_DEFAULT);$s['users'][$i]['authVersion']=($s['users'][$i]['authVersion']??1)+1;}
 }
+
+function self_user_index(array $s,array $actor,array $in): int {
+    foreach(['id','userId'] as $key)if(isset($in[$key])&&$in[$key]!==$actor['id'])throw new AppError('Yalnızca kendi profilini değiştirebilirsin.',403);
+    return find_index($s['users'],$actor['id'],'Kullanıcı');
+}
+function change_credentials(array &$s,array $actor,array $in): void {
+    $i=self_user_index($s,$actor,$in);$current=$in['currentPassword']??'';
+    if(!is_string($current)||strlen($current)>72||!password_verify($current,$s['users'][$i]['passwordHash']))throw new AppError('Mevcut şifren doğru değil.',422);
+    $username=valid_username($in['username']??null);$password=$in['password']??'';
+    if(!is_string($password))throw new AppError('Şifre geçersiz.');
+    foreach($s['users'] as $j=>$u)if($j!==$i&&$u['username']===$username)throw new AppError('Bu kullanıcı adı kullanılıyor.',409);
+    if($password!==''){
+        account_password($password);
+        if($password!==($in['passwordConfirm']??null))throw new AppError('Yeni şifreler eşleşmiyor.');
+        $s['users'][$i]['passwordHash']=password_hash($password,PASSWORD_DEFAULT);
+    }
+    $s['users'][$i]['username']=$username;
+    $s['users'][$i]['authVersion']=($s['users'][$i]['authVersion']??1)+1;
+}
+function normalized_photo(mixed $value): string {
+    if(!is_string($value)||strlen($value)>220000||!preg_match('~^data:image/(jpeg|png);base64,([A-Za-z0-9+/=]+)$~D',$value,$match))throw new AppError('Geçerli bir JPG veya PNG fotoğraf seç.');
+    $bytes=base64_decode($match[2],true);$info=$bytes===false?false:@getimagesizefromstring($bytes);
+    if(!$info||!in_array($info[2],[IMAGETYPE_JPEG,IMAGETYPE_PNG],true)||$info[0]>512||$info[1]>512||$info[0]<1||$info[1]<1)throw new AppError('Fotoğraf işlenemedi. Başka bir fotoğraf seç.');
+    if(!function_exists('imagecreatefromstring'))throw new AppError('Sunucuda fotoğraf işleme özelliği etkin değil.',503);
+    $source=@imagecreatefromstring($bytes);if(!$source)throw new AppError('Fotoğraf okunamadı.');
+    $dest=imagecreatetruecolor(256,256);imagefill($dest,0,0,imagecolorallocate($dest,245,242,252));$side=min($info[0],$info[1]);
+    imagecopyresampled($dest,$source,0,0,(int)(($info[0]-$side)/2),(int)(($info[1]-$side)/2),256,256,$side,$side);
+    ob_start();imagejpeg($dest,null,85);$output=ob_get_clean();
+    return 'data:image/jpeg;base64,'.base64_encode($output);
+}
+function save_photo(array &$s,array $actor,array $in): void {
+    $i=self_user_index($s,$actor,$in);
+    if(($in['remove']??false)===true){unset($s['users'][$i]['photo']);return;}
+    $s['users'][$i]['photo']=normalized_photo($in['photo']??null);
+}

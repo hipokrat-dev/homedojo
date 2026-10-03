@@ -70,6 +70,27 @@ try{
  use(member);assert.ok((await request('state')).body.state.tasks.some(t=>t.id===commonId));
  use(other);assert.ok(!(await request('state')).body.state.tasks.some(t=>t.id===commonId));
  use(admin);assert.equal((await request('saveTask',{scope:'shared',participantIds:['u1'],title:'Invalid shared',points:25,frequency:'daily'})).status,400);
+ // Member self-service keeps current session, revokes other devices, and checks CSRF.
+ use(member);const secondDevice=await loginAs(2);use(member);
+ const wrongCredentials={username:'anne_new',currentPassword:'wrong',password:'replacement-password',passwordConfirm:'replacement-password'};
+ assert.equal((await request('changeCredentials',wrongCredentials)).status,422);
+ assert.equal((await request('changeCredentials',{...wrongCredentials,currentPassword:'test-password-123',userId:'u1'})).status,403);
+ const changed=await request('changeCredentials',{...wrongCredentials,currentPassword:'test-password-123'});assert.equal(changed.status,200);assert.notEqual(changed.body.csrf,member.csrf);csrf=changed.body.csrf;const updatedMember={cookie,csrf};
+ assert.equal((await request('state')).status,200,'current device stays signed in');
+ use(secondDevice);assert.equal((await request('state')).status,401,'second device revoked');
+ use(updatedMember);
+ const imageData=execFileSync('php',['-r',"$i=imagecreatetruecolor(30,30);ob_start();imagepng($i);echo 'data:image/png;base64,'.base64_encode(ob_get_clean());"],{encoding:'utf8'});
+ assert.equal((await request('savePhoto',{photo:imageData},{'X-CSRF-Token':'wrong'})).status,403);
+ assert.equal((await request('savePhoto',{photo:imageData,userId:'u1'})).status,403);
+ const uploaded=await request('savePhoto',{photo:imageData});assert.equal(uploaded.status,200);assert.match(uploaded.body.state.users.find(u=>u.id==='u2').photo,/^data:image\/jpeg;base64,/);
+ const badImage=await request('savePhoto',{photo:'data:image/svg+xml;base64,PHN2Zy8+'});assert.equal(badImage.status,400);
+ assert.equal((await request('savePhoto',{photo:'x'.repeat(230001)})).status,413);
+ assert.equal((await request('savePhoto',{remove:true})).status,200);
+ assert.ok(!(await request('state')).body.state.users.find(u=>u.id==='u2').photo);
+ use(admin);
+ const lastCookie=cookie,lastCsrf=csrf;cookie='';csrf=(await request('session')).body.csrf;
+ assert.equal((await request('login',{username:'member2',password:'test-password-123'})).status,422);
+ const renamedLogin=await request('login',{username:'anne_new',password:'replacement-password'});assert.equal(renamedLogin.status,200);csrf=renamedLogin.body.csrf;assert.equal((await request('state')).body.state.viewerId,'u2');cookie=lastCookie;csrf=lastCsrf;
  // A password reset invalidates previously authenticated sessions on the next request.
  assert.equal((await request('saveAccount',{id:'u2',username:'member2',name:'Anne',avatar:'🌷',password:'new-fixture-password'})).status,200);
  use(member);assert.equal((await request('state')).status,401);

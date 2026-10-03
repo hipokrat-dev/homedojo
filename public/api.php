@@ -7,7 +7,7 @@ try{
     $config=configuration();session_start_safe();$action=$_GET['action']??'state';$method=$_SERVER['REQUEST_METHOD'];
     $development=($config['environment']??'production')==='development';
     if(!$development&&empty($config['password_hash']))throw new RuntimeException('Password is required in production.');
-    $writes=['login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem','cancelAssignment','createCompetition','cancelCompetition','claimCompetition','setupAccounts','saveAccount','reviewAssignment'];
+    $writes=['login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem','cancelAssignment','createCompetition','cancelCompetition','claimCompetition','setupAccounts','saveAccount','reviewAssignment','savePhoto','changeCredentials'];
     if(in_array($action,$writes,true)){
         if($method!=='POST')throw new AppError('Bu işlem POST gerektirir.',405);
         if(($_SERVER['HTTP_SEC_FETCH_SITE']??'')==='cross-site')throw new AppError('Bu kaynaktan işlem yapılamaz.',403);
@@ -15,14 +15,15 @@ try{
         if($origin!==''&&$origin!==$expected)throw new AppError('İstek kaynağı geçersiz.',403);
         if(!hash_equals($_SESSION['csrf'],$_SERVER['HTTP_X_CSRF_TOKEN']??''))throw new AppError('Oturum yenilendi. Sayfayı yenileyip tekrar dene.',403);
         if(!str_starts_with($_SERVER['CONTENT_TYPE']??'','application/json'))throw new AppError('JSON içerik gerekli.',415);
-        if((int)($_SERVER['CONTENT_LENGTH']??0)>16384)throw new AppError('İstek çok büyük.',413);
-        $raw=file_get_contents('php://input',false,null,0,16385);if(strlen($raw)>16384)throw new AppError('İstek çok büyük.',413);
+        $maxBytes=$action==='savePhoto'?230000:16384;
+        if((int)($_SERVER['CONTENT_LENGTH']??0)>$maxBytes)throw new AppError('İstek çok büyük.',413);
+        $raw=file_get_contents('php://input',false,null,0,$maxBytes+1);if(strlen($raw)>$maxBytes)throw new AppError('İstek çok büyük.',413);
         try{$input=json_decode($raw,true,64,JSON_THROW_ON_ERROR);}catch(JsonException){throw new AppError('Geçersiz istek.');}
         if(!is_array($input))throw new AppError('Geçersiz istek.');
     }elseif($method!=='GET')throw new AppError('Yöntem desteklenmiyor.',405);
     $store=new Store($config);if($development)$store->initialize();
     $current=$store->read();$ready=accounts_ready($current);$actor=actor_for($current,$_SESSION);
-    if($action==='session')json_response(['authenticated'=>$actor!==null,'needsAccountSetup'=>!$ready,'csrf'=>$_SESSION['csrf']]);
+    if($action==='session')json_response(['authenticated'=>$actor!==null,'needsAccountSetup'=>!$ready,'photoUploadEnabled'=>function_exists('imagecreatefromstring'),'csrf'=>$_SESSION['csrf']]);
     if($action==='logout'){$_SESSION=[];session_destroy();setcookie(session_name(),'', ['expires'=>1,'path'=>'/','secure'=>!$development,'httponly'=>true,'samesite'=>'Strict']);json_response(['ok'=>true]);}
     if($action==='login'){
         $ip=$_SERVER['REMOTE_ADDR']??'unknown';$store->attemptLogin($ip);$password=$input['password']??'';
@@ -48,6 +49,13 @@ try{
     }
     if($action==='setupAccounts')throw new AppError('Kişisel hesaplar zaten oluşturuldu.',409);
     if(!$actor)throw new AppError('Kendi kullanıcı adın ve şifrenle giriş yap.',401);
+    if($action==='changeCredentials'){
+        $limitKey='credentials:'.$actor['id'].':'.($_SERVER['REMOTE_ADDR']??'unknown');$store->attemptLogin($limitKey);
+        $current=$store->update(function(array &$s)use($input){$actor=actor_for($s,$_SESSION);if(!$actor)throw new AppError('Oturum sona erdi.',401);change_credentials($s,$actor,$input);});
+        $updated=$current['users'][find_index($current['users'],$actor['id'],'Kullanıcı')];
+        $store->clearLogin($limitKey);session_regenerate_id(true);$_SESSION=['userId'=>$updated['id'],'authVersion'=>$updated['authVersion'],'expires'=>time()+86400,'csrf'=>bin2hex(random_bytes(32))];
+        json_response(['state'=>member_snapshot($current,$updated),'csrf'=>$_SESSION['csrf']]);
+    }
     $session=$_SESSION;$csrf=$_SESSION['csrf'];session_write_close();
     if($action==='state')json_response(['state'=>member_snapshot($current,$actor),'csrf'=>$csrf]);
     $result=[];
@@ -56,6 +64,7 @@ try{
         authorize_action($s,$actor,$action,$input);
         if($action==='spin')$result=spin($s,$actor['id'],valid_text($input['frequency']??'all','Dönem',10),valid_request($input['requestId']??null));
         elseif($action==='saveAccount')save_account($s,$input);
+        elseif($action==='savePhoto')save_photo($s,$actor,$input);
         else{$input['actorId']=$actor['id'];mutate($s,$action,$input);}
     });
     json_response($result+['state'=>member_snapshot($current,$actor)]);

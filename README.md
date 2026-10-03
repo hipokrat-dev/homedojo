@@ -36,6 +36,7 @@ php tests/domain.php
 php tests/store.php
 php tests/accounts.php
 php tests/personal-catalogs.php
+php tests/profile.php
 node --check public/app.js
 node tests/http.mjs
 find app public tests -name '*.php' -exec php -l {} \;
@@ -94,3 +95,9 @@ Eski ortak şablonlar her üye için bağımsız kişisel kopyalara ayrılır. K
 ## Ortak görevler
 
 Admin görev formunda tek kişi yerine **Ortak görev** seçebilir; en az iki katılımcı işaretlenir. Aynı şablon seçilen kişilerin çarklarında görünür. Her kullanıcı görevi ayrı alır, kendi süresiyle tamamlar ve seçtiği başka üyenin onayından sonra kendi puanını kazanır. Bir kişinin tamamlaması diğerine puan vermez; iptal ve yeniden alma sınırları da kişiseldir. Katılımcı veya puan değişiklikleri sonraki atamalarda geçerlidir; alınmış görevler korunur. Ortak kayıt tek yerden düzenlenir. Admin kişi filtresine ek olarak **Ortak görevler** filtresi vardır. Ödüller kişiye özel kalır; aile yarışmasının ortak büyük ödülü ayrı yönetilir.
+
+## Profil fotoğrafı ve giriş bilgileri
+
+Her üye **Profil ayarları** ekranından fotoğraf ekleyebilir, değiştirebilir veya kaldırabilir. Tarayıcı 8 MB altındaki JPG/PNG/WebP görseli kırpıp küçültür; sunucu dosyayı doğrular ve 256×256 JPEG olarak yeniden kodlar. SVG ve bozuk dosyalar kabul edilmez, metadata tutulmaz. Fotoğraf JSON verisi içinde MySQL'de saklanır, dosya sistemine yüklenmez; otomatik dağıtımda korunur. PHP GD eklentisi gerekir.
+
+Kullanıcı adı veya şifre değişimi mevcut şifreyi gerektirir. Kullanıcı adları benzersizdir; yeni şifre tekrar doğrulanır. Başarılı değişimde oturum kimliği ve CSRF yenilenir; mevcut cihaz açık kalır, diğer cihazların oturumları bir sonraki istekte kapanır. Kullanıcı kendi rolünü veya başka bir hesabın bilgilerini değiştiremez. Başarısız doğrulamalar sınırlandırılır.
