@@ -153,6 +153,14 @@ try{
  const observedWheel=await Promise.all([request('parentApproveAssignment',{assignmentId:noGoalDraw.body.assignment.id}),request('parentApproveAssignment',{assignmentId:noGoalDraw.body.assignment.id})]);assert.deepEqual(observedWheel.map(r=>r.status),[200,200]);
  const ranged=await request('progress&mode=range&date=2026-09-28&endDate=2026-10-03');assert.equal(ranged.status,200);assert.equal(ranged.body.report.start,'2026-09-28');assert.equal(ranged.body.report.end,'2026-10-03');assert.equal(ranged.body.report.days.length,6);
  assert.equal((await request('progress&mode=range&date=2026-10-03&endDate=2026-10-02')).status,400);
+ // Parents may approve before the schedule starts; children still wait.
+ const earlyParent={cookie,csrf};use(admin);assert.equal((await request('saveRoutines',{id:'u3',routines:[{id:'early-check',title:'Evening routine',icon:'🌙',time:'23:58',until:'23:59',points:11}]})).status,200);
+ use(other);const earlyState=(await request('state')).body.state;
+ if(earlyState.dailyRoutines[0].status==='upcoming'){
+  assert.equal((await request('completeRoutine',{routineId:'early-check',day:earlyState.today,parentObservedEarly:true})).status,409);
+  use(earlyParent);const earlyResults=await Promise.all([request('parentApproveRoutine',{childId:'u3',routineId:'early-check',day:earlyState.today}),request('parentApproveRoutine',{childId:'u3',routineId:'early-check',day:earlyState.today})]);assert.deepEqual(earlyResults.map(r=>r.status),[200,200]);
+  use(other);const earlyCompletions=(await request('state')).body.state.completions.filter(c=>c.taskId==='routine-early-check');assert.equal(earlyCompletions.length,1);assert.equal(earlyCompletions[0].submittedEarly,true);
+ }use(earlyParent);
  // Child reward requests: nonadmin parent pricing, concurrent review and privacy.
  const wishParent={cookie,csrf};use(other);
  const wishInput={requestId:'wish-http-request-12345',title:'Aile sineması',icon:'🎬',parentId:'u2',cost:1,childId:'u4'};

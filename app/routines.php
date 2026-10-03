@@ -32,7 +32,7 @@ function daily_routines(array $s,array $u,?DateTimeImmutable $now=null): array {
         foreach($s['assignments'] as $a)if($a['userId']===$u['id']&&($a['routineId']??null)===$r['id']&&($a['routineDay']??null)===$day){
             // Keep already submitted task content and deadlines stable if the admin edits the schedule.
             foreach(['title','icon','points','dueAt'] as $key)$r[$key]=$a[$key];
-            $r['time']=$a['routineTime']??$r['time'];$r['status']=assignment_status($a,$now);$r['assignmentId']=$a['id'];break;
+            $r['time']=$a['routineTime']??$r['time'];$r['status']=assignment_status($a,$now);$r['assignmentId']=$a['id'];$r['submittedEarly']=$a['submittedEarly']??false;break;
         }
         $r['late']=$now>=new DateTimeImmutable($r['dueAt']);
         $rows[]=$r;
@@ -52,20 +52,20 @@ function save_routines(array &$s,array $in,?DateTimeImmutable $now=null): void {
     }
     $s['users'][$i]['routineSchedule']=$out;record_routine_program($s['users'][$i],$now);
 }
-function complete_routine(array &$s,array $actor,array $in,?DateTimeImmutable $now=null): void {
+function complete_routine(array &$s,array $actor,array $in,?DateTimeImmutable $now=null,bool $parentObservedEarly=false): void {
     if(!has_daily_program($actor))throw new AppError('Bu ekran çocuk hesabı içindir.',403);
     if(isset($in['userId'])&&$in['userId']!==$actor['id'])throw new AppError('Yalnızca kendi görevini tamamlayabilirsin.',403);
     $u=$s['users'][active_user_index($s,$actor['id'])];$now=now_tr($now);$day=$now->format('Y-m-d');
     if(($in['day']??null)!==$day)throw new AppError('Yeni bir güne geçtik. Günlük görevlerini yenile.',409);
     $rows=daily_routines($s,$u,$now);$r=$rows[find_index($rows,$in['routineId']??null,'Günlük görev')];
     if(in_array($r['status'],['pending','completed'],true))return; // Idempotent double taps and retries.
-    if($r['status']!=='active')throw new AppError('Bu görevin saati şu anda uygun değil.',409);
+    if($r['status']!=='active'&&!($parentObservedEarly&&$r['status']==='upcoming'))throw new AppError('Bu görevin saati şu anda uygun değil.',409);
     $guardian=routine_guardian($s,$u);$at=$now->format(DateTimeInterface::ATOM);
     if(isset($r['assignmentId']))$i=find_index($s['assignments'],$r['assignmentId'],'Görev');
     else{
         $i=count($s['assignments']);$s['assignments'][]=['id'=>uid(),'requestId'=>'routine-'.uid(),'userId'=>$u['id'],'taskId'=>'routine-'.$r['id'],'routineId'=>$r['id'],'routineDay'=>$day,'routineTime'=>$r['time'],'title'=>$r['title'],'icon'=>$r['icon'],'description'=>'Günlük küçük adım · '.$r['time'],'points'=>$r['points'],'frequency'=>'daily','periodStart'=>$day,'assignedAt'=>$at,'dueAt'=>$r['dueAt'],'goalRewardId'=>null,'goalTitle'=>'Günlük küçük adımlar'];
     }
-    $s['assignments'][$i]=array_merge($s['assignments'][$i],['status'=>'pending','submittedAt'=>$at,'submittedLate'=>$now>=new DateTimeImmutable($r['dueAt']),'reviewerId'=>$guardian['id']]);
+    $s['assignments'][$i]=array_merge($s['assignments'][$i],['status'=>'pending','submittedAt'=>$at,'submittedEarly'=>$now<new DateTimeImmutable($r['startsAt']),'submittedLate'=>$now>=new DateTimeImmutable($r['dueAt']),'reviewerId'=>$guardian['id']]);
 }
 
 function parent_daily_routines(array $s,array $actor,?DateTimeImmutable $now=null): array {
@@ -83,8 +83,8 @@ function parent_approve_routine(array &$s,array $actor,array $in,?DateTimeImmuta
     $now=now_tr($now);if(($in['day']??null)!==$now->format('Y-m-d'))throw new AppError('Gün değişti. Sayfayı yenile.',409);
     $tasks=daily_routines($s,$child,$now);$task=$tasks[find_index($tasks,$in['routineId']??null,'Günlük görev')];
     if($task['status']==='completed')return;
-    if(!in_array($task['status'],['active','pending'],true))throw new AppError('Bu görev henüz onaylanamaz.',409);
-    complete_routine($s,$child,['day'=>$in['day'],'routineId'=>$task['id']],$now);
+    if(!in_array($task['status'],['active','pending','upcoming'],true))throw new AppError('Bu görev henüz onaylanamaz.',409);
+    complete_routine($s,$child,['day'=>$in['day'],'routineId'=>$task['id']],$now,true);
     foreach($s['assignments'] as $i=>$a)if($a['userId']===$child['id']&&($a['routineDay']??null)===$in['day']&&($a['routineId']??null)===$task['id']){
         $s['assignments'][$i]['observedBy']=$parent['id'];$s['assignments'][$i]['observedAt']=$now->format(DateTimeInterface::ATOM);
         $s['assignments'][$i]['originalReviewerId'] ??= $a['reviewerId'];$s['assignments'][$i]['reviewerId']=$parent['id'];

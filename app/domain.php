@@ -186,7 +186,7 @@ function mutate(array &$state,string $action,array $in,?DateTimeImmutable $now=n
         }
         if(!isset($a['routineId'])&&empty($a['noDeadline'])&&new DateTimeImmutable($a['submittedAt'])>=new DateTimeImmutable($a['dueAt']))throw new AppError('Görev süresinde gönderilmemiş.',409);
         $state['assignments'][$i]['status']='completed';$state['assignments'][$i]['completedAt']=$at;
-        $state['completions'][]=['id'=>uid(),'assignmentId'=>$a['id'],'userId'=>$a['userId'],'taskId'=>$a['taskId'],'title'=>$a['title'],'icon'=>$a['icon'],'points'=>$a['points'],'frequency'=>$a['frequency'],'day'=>substr($a['submittedAt'],0,10),'at'=>$a['submittedAt'],'submittedLate'=>$a['submittedLate']??false,'approvedAt'=>$at,'approvedBy'=>$in['actorId'],'dueAt'=>$a['dueAt'],'goalTitle'=>$a['goalTitle']];break;
+        $state['completions'][]=['id'=>uid(),'assignmentId'=>$a['id'],'userId'=>$a['userId'],'taskId'=>$a['taskId'],'title'=>$a['title'],'icon'=>$a['icon'],'points'=>$a['points'],'frequency'=>$a['frequency'],'day'=>substr($a['submittedAt'],0,10),'at'=>$a['submittedAt'],'submittedEarly'=>$a['submittedEarly']??false,'submittedLate'=>$a['submittedLate']??false,'approvedAt'=>$at,'approvedBy'=>$in['actorId'],'dueAt'=>$a['dueAt'],'goalTitle'=>$a['goalTitle']];break;
     case 'redeem':
         $i=find_index($state['users'],$in['userId']??null,'Kullanıcı');$reward=$state['rewards'][find_index($state['rewards'],$in['rewardId']??null,'Ödül')];
         if($reward['ownerId']!==$in['userId'])throw new AppError('Bu ödül sana ait değil.',403);
