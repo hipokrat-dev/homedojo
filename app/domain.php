@@ -12,7 +12,7 @@ function upgrade_state(array $state): array {
     foreach(['tasks','rewards'] as $kind){
         $items=[];
         foreach($state[$kind] as $item){
-            if(isset($item['ownerId'])){$items[]=$item;continue;}
+            if(isset($item['ownerId'])||($kind==='tasks'&&($item['scope']??'')==='shared')){$items[]=$item;continue;}
             foreach($state['users'] as $index=>$u){
                 $id=$index===0?$item['id']:substr(hash('sha256','personal-v5:'.$kind.':'.$item['id'].':'.$u['id']),0,32);
                 $maps[$kind][$item['id']][$u['id']]=$id;
@@ -29,7 +29,7 @@ function upgrade_state(array $state): array {
             }
         }unset($row);
     }
-    $state['version'] = 5;
+    $state['version'] = 6;
     return $state;
 }
 function initial_state(): array { return upgrade_state(json_decode(file_get_contents(__DIR__.'/seed.json'), true, 512, JSON_THROW_ON_ERROR)); }
@@ -57,9 +57,14 @@ function is_done(array $state, string $userId, array $task, ?DateTimeImmutable $
     }
     return false;
 }
+function task_visible_to(array $task,string $userId): bool {
+    return ($task['scope']??'personal')==='shared'
+        ? in_array($userId,$task['participantIds']??[],true)
+        : ($task['ownerId']??null)===$userId;
+}
 function available_tasks(array $state,string $userId,string $frequency='all',?DateTimeImmutable $now=null): array {
     return array_values(array_filter($state['tasks'],function($t)use($state,$userId,$frequency,$now){
-        if(($t['ownerId']??null)!==$userId)return false;
+        if(!task_visible_to($t,$userId))return false;
         if($frequency!=='all'&&$t['frequency']!==$frequency)return false;
         if(is_done($state,$userId,$t,$now))return false;
         foreach($state['assignments']??[] as $a){
@@ -114,11 +119,21 @@ function mutate(array &$state,string $action,array $in,?DateTimeImmutable $now=n
     switch($action){
     case 'saveTask': case 'saveReward':
         $task=$action==='saveTask'; $key=$task?'tasks':'rewards'; $points=$task?'points':'cost';
-        $owner=valid_text($in['ownerId']??null,'Görevin veya ödülün sahibi',64);find_index($state['users'],$owner,'Kullanıcı');
+        $scope=$task?($in['scope']??'personal'):'personal';
+        if(!in_array($scope,['personal','shared'],true))throw new AppError('Görev türü geçersiz.');
+        $participants=[];$owner='';
+        if($scope==='shared'){
+            $participants=$in['participantIds']??null;
+            if(!is_array($participants)||!array_is_list($participants)||count($participants)<2||count($participants)>count($state['users']))throw new AppError('Ortak görev için en az iki kişi seçin.');
+            foreach($participants as $id){if(!is_string($id))throw new AppError('Katılımcı geçersiz.');find_index($state['users'],$id,'Katılımcı');}
+            if(count(array_unique($participants))!==count($participants))throw new AppError('Katılımcılar tekrarlanamaz.');
+        }else{$owner=valid_text($in['ownerId']??null,'Görevin veya ödülün sahibi',64);find_index($state['users'],$owner,'Kullanıcı');}
         $value=['ownerId'=>$owner,'title'=>valid_text($in['title']??null,'Ad',80),'description'=>valid_text($in['description']??'','Açıklama',240,false),$points=>valid_points($in[$points]??null),'icon'=>valid_text($in['icon']??($task?'✨':'🎁'),'Simge',12)];
-        if($task){if(!in_array($in['frequency']??null,['daily','weekly','monthly'],true))throw new AppError('Görev dönemi geçersiz.');$value['frequency']=$in['frequency'];}
+        if($task){if(!in_array($in['frequency']??null,['daily','weekly','monthly'],true))throw new AppError('Görev dönemi geçersiz.');$value['frequency']=$in['frequency'];$value['scope']=$scope;$value['participantIds']=$participants;}
+        $affected=$scope==='shared'?$participants:[$owner];
+        foreach($affected as $id){$count=count(array_filter($state[$key],fn($r)=>$r['id']!==($in['id']??null)&&($task?task_visible_to($r,$id):$r['ownerId']===$id)));if($count>=100)throw new AppError('Bir kişiye en fazla 100 aktif kayıt ekleyebilirsiniz.');}
         if(isset($in['id'])){$i=find_index($state[$key],$in['id'],'Kayıt');$state[$key][$i]=array_merge($state[$key][$i],$value);}
-        else{if(count(array_filter($state[$key],fn($r)=>$r['ownerId']===$owner))>=100)throw new AppError('Bir kişiye en fazla 100 aktif kayıt ekleyebilirsiniz.');$state[$key][]=['id'=>uid()]+$value;} break;
+        else{$state[$key][]=['id'=>uid()]+$value;} break;
     case 'deleteTask': case 'deleteReward':
         $key=$action==='deleteTask'?'tasks':'rewards'; $i=find_index($state[$key],$in['id']??null,'Kayıt');array_splice($state[$key],$i,1);break;
     case 'saveUser':

@@ -35,4 +35,27 @@ mutate($s,'saveTask',array_merge($task2,['ownerId'=>'u4']),$t);verify(!in_array(
 // An active family prize never grants access to another member's tasks.
 mutate($s,'createCompetition',['title'=>'Shared','prize'=>'Picnic','target'=>500,'frequency'=>'weekly'],$t);$draw=spin($s,'u3','daily',uid(),$t);verify(count(array_filter($draw['candidates'],fn($r)=>$r['ownerId']!=='u3'))===0,'Family spin candidates remain personal');
 verify($draw['assignment']['userId']==='u3','Draw belongs to actor');
+// Shared templates are single records, with per-person assignments and points.
+$family=initial_state();mutate($family,'createCompetition',['title'=>'Family','prize'=>'Picnic','target'=>500,'frequency'=>'weekly'],$t);
+mutate($family,'saveTask',['scope'=>'shared','participantIds'=>['u1','u2'],'title'=>'Sofrayı hazırla','points'=>35,'frequency'=>'daily'],$t);
+$shared=$family['tasks'][array_key_last($family['tasks'])];$family['tasks']=[$shared];
+verify(count(upgrade_state($family)['tasks'])===1,'Shared record never cloned by migration');
+verify(count(member_snapshot($family,['id'=>'u1','role'=>'member'])['tasks'])===1,'Shared participant can see task');
+verify(count(member_snapshot($family,['id'=>'u3','role'=>'member'])['tasks'])===0,'Excluded member cannot see shared task');
+blocked(function()use(&$family,$t){spin($family,'u3','daily',uid(),$t);},409);
+$a=spin($family,'u1','daily',uid(),$t)['assignment'];$b=spin($family,'u2','daily',uid(),$t)['assignment'];
+verify($a['taskId']===$b['taskId']&&$a['id']!==$b['id'],'Shared template, separate assignments');
+mutate($family,'complete',['userId'=>'u1','assignmentId'=>$a['id'],'reviewerId'=>'u2'],$t);
+mutate($family,'reviewAssignment',['actorId'=>'u2','assignmentId'=>$a['id'],'decision'=>'approve'],$t);
+verify(balance($family,'u1')===35&&balance($family,'u2')===0,'One completion never awards other participant');
+verify(assignment_status($family['assignments'][1],$t)==='active','Other participant remains active');
+mutate($family,'cancelAssignment',['userId'=>'u2','assignmentId'=>$b['id']],$t);
+verify(count(available_tasks($family,'u2','daily',$t))===1&&count(available_tasks($family,'u1','daily',$t))===0,'Cooldown and cancellation independent');
+mutate($family,'saveTask',array_merge($shared,['participantIds'=>['u3','u4'],'points'=>90]),$t);
+verify(count(available_tasks($family,'u2','daily',$t))===0&&count(available_tasks($family,'u3','daily',$t))===1,'Participant change affects future draws');
+verify($family['assignments'][0]['points']===35,'Shared edit preserves frozen points');
+foreach([[],['u1'],['u1','u1'],['u1','missing'],'u1,u2',[1,'u2']] as $ids){blocked(function()use(&$family,$ids,$t){mutate($family,'saveTask',['scope'=>'shared','participantIds'=>$ids,'title'=>'Invalid','points'=>10,'frequency'=>'daily'],$t);},$ids===['u1','missing']?404:400);}
+mutate($family,'saveTask',array_merge($shared,['scope'=>'personal','ownerId'=>'u4']),$t);
+verify(!task_visible_to($family['tasks'][0],'u1')&&task_visible_to($family['tasks'][0],'u4'),'Shared task can become personal');
+verify($family['tasks'][0]['participantIds']===[],'Personal conversion clears shared recipients');
 echo "✓ $n personal catalog, legacy migration and access checks passed.\n";

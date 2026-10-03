@@ -65,6 +65,11 @@ try{
  use(member);const won=await request('reviewAssignment',{assignmentId:shared.id,decision:'approve'});assert.equal(won.body.state.familyGoal.total,80);
  use(admin);const prize=await Promise.all([request('claimCompetition',{id:contest.id}),request('claimCompetition',{id:contest.id})]);assert.deepEqual(prize.map(r=>r.status).sort(),[200,409]);
  assert.equal((await request('state')).body.state.users.find(u=>u.id==='u3').balance,80);
+ // A shared task reaches only its selected members, while rewards remain personal.
+ const common=await request('saveTask',{scope:'shared',participantIds:['u1','u2'],title:'Shared table',points:25,frequency:'daily'});assert.equal(common.status,200);const commonId=common.body.state.tasks.at(-1).id;
+ use(member);assert.ok((await request('state')).body.state.tasks.some(t=>t.id===commonId));
+ use(other);assert.ok(!(await request('state')).body.state.tasks.some(t=>t.id===commonId));
+ use(admin);assert.equal((await request('saveTask',{scope:'shared',participantIds:['u1'],title:'Invalid shared',points:25,frequency:'daily'})).status,400);
  // A password reset invalidates previously authenticated sessions on the next request.
  assert.equal((await request('saveAccount',{id:'u2',username:'member2',name:'Anne',avatar:'🌷',password:'new-fixture-password'})).status,200);
  use(member);assert.equal((await request('state')).status,401);

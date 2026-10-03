@@ -40,7 +40,7 @@ function member_snapshot(array $s,array $actor): array {
     foreach($v['users'] as &$u){unset($u['passwordHash'],$u['authVersion']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
     $v['assignments']=array_values(array_filter($v['assignments'],fn($a)=>$a['userId']===$actor['id']||($a['reviewerId']??null)===$actor['id']));
     foreach(['completions','redemptions'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($a)=>$a['userId']===$actor['id']));
-    if($actor['role']!=='admin')foreach(['tasks','rewards'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($r)=>$r['ownerId']===$actor['id']));
+    if($actor['role']!=='admin')foreach(['tasks','rewards'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($r)=>$key==='tasks'?task_visible_to($r,$actor['id']):$r['ownerId']===$actor['id']));
     return $v;
 }
 function save_account(array &$s,array $in): void {
