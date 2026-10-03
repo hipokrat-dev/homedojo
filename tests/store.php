@@ -7,8 +7,9 @@ $store->update(function(&$s){mutate($s,'selectGoal',['userId'=>'u1','rewardId'=>
 $assignment=$store->read()['assignments'][0];
 try{$store->update(function(&$s){$s['users'][0]['name']='Must roll back';throw new AppError('Expected');});}catch(AppError){}
 if($store->read()['users'][0]['name']!=='Oyuncu 1')throw new RuntimeException('Rollback failed');
-$store->update(function(&$s)use($assignment){mutate($s,'complete',['userId'=>'u1','assignmentId'=>$assignment['id']]);});
-try{$store->update(function(&$s)use($assignment){mutate($s,'complete',['userId'=>'u1','assignmentId'=>$assignment['id']]);});throw new RuntimeException('Duplicate accepted');}catch(AppError $e){if($e->status!==409)throw $e;}
+$store->update(function(&$s)use($assignment){mutate($s,'complete',['userId'=>'u1','assignmentId'=>$assignment['id'],'reviewerId'=>'u2']);});
+$store->update(function(&$s)use($assignment){mutate($s,'reviewAssignment',['assignmentId'=>$assignment['id'],'actorId'=>'u2','decision'=>'approve']);});
+try{$store->update(function(&$s)use($assignment){mutate($s,'complete',['userId'=>'u1','assignmentId'=>$assignment['id'],'reviewerId'=>'u2']);});throw new RuntimeException('Duplicate accepted');}catch(AppError $e){if($e->status!==409)throw $e;}
 if(balance($store->read(),'u1')!==$assignment['points'])throw new RuntimeException('Duplicate write credited twice');
 for($i=0;$i<15;$i++)$store->attemptLogin('test-ip');
 try{$store->attemptLogin('test-ip');throw new RuntimeException('Rate limit failed');}catch(AppError $e){if($e->status!==429)throw $e;}

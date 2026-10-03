@@ -7,7 +7,7 @@ function upgrade_state(array $state): array {
     // Additive migration: never overwrite profiles, scores, tasks or reward history.
     $state['assignments'] ??= [];
     $state['competitions'] ??= [];
-    $state['version'] = 3;
+    $state['version'] = 4;
     return $state;
 }
 function initial_state(): array { return upgrade_state(json_decode(file_get_contents(__DIR__.'/seed.json'), true, 512, JSON_THROW_ON_ERROR)); }
@@ -24,7 +24,7 @@ function deadline(string $frequency, ?DateTimeImmutable $now=null): DateTimeImmu
     return $month->setDate((int)$month->format('Y'),(int)$month->format('m'),min((int)$start->format('d'),(int)$month->format('t')));
 }
 function assignment_status(array $assignment,?DateTimeImmutable $now=null): string {
-    if(in_array($assignment['status']??'active',['completed','cancelled'],true))return $assignment['status'];
+    if(in_array($assignment['status']??'active',['completed','cancelled','pending'],true))return $assignment['status'];
     return now_tr($now)>=new DateTimeImmutable($assignment['dueAt'])?'expired':'active';
 }
 function is_done(array $state, string $userId, array $task, ?DateTimeImmutable $now = null): bool {
@@ -40,7 +40,7 @@ function available_tasks(array $state,string $userId,string $frequency='all',?Da
         if($frequency!=='all'&&$t['frequency']!==$frequency)return false;
         if(is_done($state,$userId,$t,$now))return false;
         foreach($state['assignments']??[] as $a){
-            if($a['userId']===$userId&&$a['taskId']===$t['id']&&assignment_status($a,$now)==='active')return false;
+            if($a['userId']===$userId&&$a['taskId']===$t['id']&&in_array(assignment_status($a,$now),['active','pending'],true))return false;
         }
         return true;
     }));
@@ -120,15 +120,25 @@ function mutate(array &$state,string $action,array $in,?DateTimeImmutable $now=n
         if(assignment_status($a,$now)!=='active')throw new AppError('Yalnızca devam eden görev iptal edilebilir.',409);
         $state['assignments'][$i]['status']='cancelled';$state['assignments'][$i]['cancelledAt']=$at;break;
     case 'complete':
-        find_index($state['users'],$in['userId']??null,'Kullanıcı');
-        $i=find_index($state['assignments'],$in['assignmentId']??null,'Atanmış görev');$a=$state['assignments'][$i];
-        if($a['userId']!==$in['userId'])throw new AppError('Bu görev başka bir profile ait.',403);
-        $status=assignment_status($a,$now);
-        if($status==='cancelled')throw new AppError('İptal edilen görevden puan kazanılamaz.',409);
-        if($status==='completed')throw new AppError('Bu görevin puanı zaten verildi.',409);
-        if($status==='expired')throw new AppError('Süre doldu. Bu görevden puan kazanılamaz.',409);
+        $i=find_index($state['assignments'],$in['assignmentId']??null,'Görev');$a=$state['assignments'][$i];
+        if($a['userId']!==($in['userId']??null))throw new AppError('Bu görev başka bir kullanıcıya ait.',403);
+        if(assignment_status($a,$now)!=='active')throw new AppError('Yalnızca süresi dolmamış aktif görev onaya gönderilebilir.',409);
+        $reviewer=$in['reviewerId']??null;find_index($state['users'],$reviewer,'Onaycı');
+        if($reviewer===$a['userId'])throw new AppError('Kendi görevini onaylayamazsın.',403);
+        $state['assignments'][$i]=array_merge($a,['status'=>'pending','submittedAt'=>$at,'reviewerId'=>$reviewer]);break;
+    case 'reviewAssignment':
+        $i=find_index($state['assignments'],$in['assignmentId']??null,'Görev');$a=$state['assignments'][$i];
+        if(($a['reviewerId']??null)!==($in['actorId']??null)||$a['userId']===($in['actorId']??null))throw new AppError('Bu görevin seçilen onaycısı değilsin.',403);
+        if(assignment_status($a,$now)!=='pending')throw new AppError('Bu görev zaten değerlendirildi.',409);
+        if(!in_array($in['decision']??null,['approve','reject'],true))throw new AppError('Karar geçersiz.');
+        $state['assignments'][$i]['reviews'][]=['by'=>$in['actorId'],'decision'=>$in['decision'],'at'=>$at];
+        if($in['decision']==='reject'){
+            $state['assignments'][$i]['status']='active';$state['assignments'][$i]['rejectedAt']=$at;
+            unset($state['assignments'][$i]['submittedAt'],$state['assignments'][$i]['reviewerId']);break;
+        }
+        if(new DateTimeImmutable($a['submittedAt'])>=new DateTimeImmutable($a['dueAt']))throw new AppError('Görev süresinde gönderilmemiş.',409);
         $state['assignments'][$i]['status']='completed';$state['assignments'][$i]['completedAt']=$at;
-        $state['completions'][]=['id'=>uid(),'assignmentId'=>$a['id'],'userId'=>$a['userId'],'taskId'=>$a['taskId'],'title'=>$a['title'],'icon'=>$a['icon'],'points'=>$a['points'],'frequency'=>$a['frequency'],'day'=>now_tr($now)->format('Y-m-d'),'at'=>$at,'dueAt'=>$a['dueAt'],'goalTitle'=>$a['goalTitle']];break;
+        $state['completions'][]=['id'=>uid(),'assignmentId'=>$a['id'],'userId'=>$a['userId'],'taskId'=>$a['taskId'],'title'=>$a['title'],'icon'=>$a['icon'],'points'=>$a['points'],'frequency'=>$a['frequency'],'day'=>substr($a['submittedAt'],0,10),'at'=>$a['submittedAt'],'approvedAt'=>$at,'approvedBy'=>$in['actorId'],'dueAt'=>$a['dueAt'],'goalTitle'=>$a['goalTitle']];break;
     case 'redeem':
         $i=find_index($state['users'],$in['userId']??null,'Kullanıcı');$reward=$state['rewards'][find_index($state['rewards'],$in['rewardId']??null,'Ödül')];
         valid_request($in['requestId']??null);
