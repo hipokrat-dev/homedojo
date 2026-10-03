@@ -6,7 +6,7 @@ function valid_username(mixed $v): string {
     return strtolower($v);
 }
 function account_password(mixed $v): string {
-    if(!is_string($v)||strlen($v)<12||strlen($v)>72)throw new AppError('Şifre 12–72 karakter olmalı.');return $v;
+    if(!is_string($v)||mb_strlen($v)<4||strlen($v)>72)throw new AppError('Şifre en az 4 karakter olmalı (en fazla 72 bayt).');return $v;
 }
 function setup_accounts(array &$s,array $in): void {
     if(accounts_ready($s))throw new AppError('Kişisel hesaplar zaten oluşturuldu.',409);

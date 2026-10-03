@@ -29,3 +29,7 @@ mutate($s,'complete',['userId'=>'u1','assignmentId'=>$b['id'],'reviewerId'=>'u4'
 check(assignment_status($s['assignments'][1],$t->modify('+3 days'))==='expired','Rejection after deadline cannot extend time');
 save_account($s,['id'=>'u1','username'=>'baba','name'=>'Baba','avatar'=>'🌻','password'=>'fixture-new-password']);check(actor_for($s,$session)===null,'Password change revokes existing sessions');
 echo "✓ $count account, privacy, role and approval checks passed.\n";
+
+check(account_password('1234')==='1234','Four-digit player password accepted');
+check(account_password('şğüı')==='şğüı','Four Turkish characters accepted');
+try{account_password('123');throw new RuntimeException('Three-character password accepted');}catch(AppError $e){check($e->status===400,'Too short password rejected');}

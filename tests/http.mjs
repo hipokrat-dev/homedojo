@@ -1,6 +1,7 @@
 import {mkdtemp,cp,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {createHash} from 'node:crypto';
 import {spawn,execFileSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 const dir=await mkdtemp(join(tmpdir(),'homedojo-test-'));
@@ -21,6 +22,14 @@ try{
  assert.equal((await request('login',{password:'test-household-password'},{Origin:'https://evil.example'})).status,403,'cross origin rejected');
  const oldCookie=cookie,login=await request('login',{password:'test-household-password'});assert.equal(login.status,200);csrf=login.body.csrf;assert.notEqual(cookie,oldCookie,'session regenerated');
  const setup=(await request('state')).body;assert.equal(setup.setupRequired,true);assert.equal(setup.profiles.length,4);
+ // Hosting-authorized recovery opens setup once, without modifying existing data.
+ cookie='';csrf=(await request('session')).body.csrf;
+ assert.equal((await fetch(base+'/recover.php',{headers:{Cookie:cookie}})).status,403,'Recovery is locked without owner key');
+ const recoveryKey='a'.repeat(64);await writeFile(join(dir,'app','recovery-key.json'),JSON.stringify({hash:createHash('sha256').update(recoveryKey).digest('hex'),expires:Math.floor(Date.now()/1000)+600}));
+ const recover=async(key,token=csrf)=>fetch(base+'/recover.php',{method:'POST',redirect:'manual',headers:{Cookie:cookie,Origin:base,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({key,csrf:token})});
+ assert.equal((await recover(recoveryKey,'bad')).status,403);assert.equal((await recover('b'.repeat(64))).status,403);
+ const recovered=await recover(recoveryKey);assert.equal(recovered.status,302);cookie=recovered.headers.get('set-cookie').split(';')[0];csrf=(await request('session')).body.csrf;
+ assert.equal((await request('state')).body.setupRequired,true,'Recovered session can open setup');assert.equal((await recover(recoveryKey)).status,403,'Consumed key cannot be reused');
  const accounts=setup.profiles.map((u,i)=>({id:u.id,name:i===0?'Baba':['','Anne','Ada','Efe'][i],username:'member'+(i+1),password:'test-password-123'}));
  const activation=await request('setupAccounts',{adminId:'u1',accounts});assert.equal(activation.status,200);csrf=activation.body.csrf;
  const initial=activation.body.state;assert.equal(initial.viewerId,'u1');assert.equal(initial.viewerRole,'admin');assert.equal(initial.users.length,4);assert.equal(initial.tasks.length,40);

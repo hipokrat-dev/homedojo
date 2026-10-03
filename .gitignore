@@ -6,3 +6,5 @@ app/setup-key.php
 *.sqlite*
 test-results/
 .DS_Store
+
+app/recovery-key.json*

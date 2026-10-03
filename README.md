@@ -132,3 +132,5 @@ Canlı alan adı `https://yapeglen.com` adresidir. Üretim için genel adres aya
 Çocuk, Ödül istekleri ekranından bir ebeveyn seçerek hayalindeki ödülü gönderir. Seçilen ebeveyn (veya admin) puan belirleyip onaylar ya da notuyla geri çevirir. Onay, kişisel ödülü ve aktif hedefi oluşturur; puan kazandırmaz. Çocuk görev onaylarıyla puan toplar ve yeterli bakiyede mevcut ödül akışını kullanır. Bekleyen istek geri çekilebilir; en fazla beş istek bekleyebilir. Ses tercihi çarkla ortaktır; hareket azaltma tercihi efektlerde korunur.
 
 Doğrulama: `php tests/wishes.php`, `node tests/http.mjs`.
+
+Oyuncu şifreleri en az 4 karakterdir; sayı kullanmak yeterlidir. Eski ev şifresi unutulmuş ve kişisel hesaplar henüz açılmamışsa `recover.php`, yalnızca Hostinger üzerinden yüklenen `app/recovery-key.json` içindeki SHA-256 anahtar özeti ve en fazla 24 saatlik son kullanma zamanı ile açılır. Dosya ve anahtar GitHub’a gönderilmez. Başarılı kullanım dosyayı tüketir ve 30 dakikalık hesap kurulum oturumu açar; mevcut veriler ve veritabanı ayarları değişmez. Kişisel hesaplar oluşturulunca bu kurtarma yolu kapanır.

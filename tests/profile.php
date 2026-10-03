@@ -7,7 +7,7 @@ $in=['username'=>'new_member','currentPassword'=>'fixture-password-123','passwor
 denied_profile(function()use(&$s,$actor,$in){change_credentials($s,$actor,$in+['userId'=>'u1']);},403);
 denied_profile(function()use(&$s,$actor,$in){change_credentials($s,$actor,array_merge($in,['currentPassword'=>'wrong']));},422);
 denied_profile(function()use(&$s,$actor,$in){change_credentials($s,$actor,array_merge($in,['username'=>'MEMBER0']));},409);
-denied_profile(function()use(&$s,$actor,$in){change_credentials($s,$actor,array_merge($in,['password'=>'short','passwordConfirm'=>'short']));},400);
+denied_profile(function()use(&$s,$actor,$in){change_credentials($s,$actor,array_merge($in,['password'=>'abc','passwordConfirm'=>'abc']));},400);
 denied_profile(function()use(&$s,$actor,$in){change_credentials($s,$actor,array_merge($in,['passwordConfirm'=>'not-matching']));},400);
 change_credentials($s,$actor,$in+['role'=>'admin']);verify_profile($s['users'][1]['role']==='member','Cannot change role');verify_profile(password_verify('new-password-123',$s['users'][1]['passwordHash']),'New password works');verify_profile(!password_verify('fixture-password-123',$s['users'][1]['passwordHash']),'Old password revoked');verify_profile(actor_for($s,$session)===null,'Other sessions revoked');
 $hash=$s['users'][1]['passwordHash'];change_credentials($s,$s['users'][1],['username'=>'other_name','currentPassword'=>'new-password-123','password'=>'']);verify_profile($s['users'][1]['passwordHash']===$hash,'Username-only edit preserves password');
