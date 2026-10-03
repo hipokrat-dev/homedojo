@@ -8,9 +8,9 @@ function complete_approved(array &$s,string $action,array $in,?DateTimeImmutable
 $passed=0;
 function ok(bool $condition,string $name):void{global $passed;if(!$condition)throw new RuntimeException('FAIL: '.$name);$passed++;echo "✓ $name\n";}
 function rejects(callable $fn,int $status,string $name):void{try{$fn();}catch(AppError $e){ok($e->status===$status,$name);return;}throw new RuntimeException('FAIL: '.$name);}
-function goal(array &$s,string $user='u1'):void{mutate($s,'selectGoal',['userId'=>$user,'rewardId'=>'r1']);}
+function goal(array &$s,string $user='u1'):void{mutate($s,'selectGoal',['userId'=>$user,'rewardId'=>array_values(array_filter($s['rewards'],fn($r)=>$r['ownerId']===$user))[0]['id']]);}
 $friday=new DateTimeImmutable('2026-10-02T12:00:00+03:00');$s=initial_state();
-ok(count($s['users'])===4&&count($s['tasks'])===10,'Four profiles and ten example tasks');
+ok(count($s['users'])===4&&count($s['tasks'])===40,'Four profiles with ten independent example tasks each');
 rejects(function()use(&$s,$friday){spin($s,'u1','all',uid(),$friday);},409,'Choose target reward before spinning');
 goal($s);$draw=spin($s,'u1','all','draw-request-123456',$friday);$a=$draw['assignment'];
 ok(count($draw['candidates'])===10&&count($s['assignments'])===1,'Draw persists an assignment from ten candidates');
@@ -43,18 +43,18 @@ foreach(['daily'=>'2026-10-03T12:00:00+03:00','weekly'=>'2026-10-09T12:00:00+03:
 ok(deadline('monthly',new DateTimeImmutable('2028-02-29T23:59:59+03:00'))->format('Y-m-d')==='2028-03-29','One calendar month after leap day');
 ok(period_start('weekly',new DateTimeImmutable('2027-01-01T12:00:00+03:00'))==='2026-12-28','Week across year boundary');
 ok(deadline('daily',new DateTimeImmutable('2026-10-02T21:00:00Z'))->format('Y-m-d')==='2026-10-04','UTC converted to Istanbul before deadline calculation');
-$t=initial_state();goal($t);foreach($t['tasks']as $_){$d=spin($t,'u1','all',uid(),$friday);complete_approved($t,'complete',['userId'=>'u1','assignmentId'=>$d['assignment']['id']],$friday);}
-$earned=earned($t,'u1');ok($earned===array_sum(array_column($t['tasks'],'points')),'All ten tasks award their own points');
+$t=initial_state();goal($t);foreach(array_filter($t['tasks'],fn($x)=>$x['ownerId']==='u1') as $_){$d=spin($t,'u1','all',uid(),$friday);complete_approved($t,'complete',['userId'=>'u1','assignmentId'=>$d['assignment']['id']],$friday);}
+$earned=earned($t,'u1');ok($earned===array_sum(array_column(array_filter($t['tasks'],fn($x)=>$x['ownerId']==='u1'),'points')),'All ten tasks award their own points');
 rejects(function()use(&$t,$friday){spin($t,'u1','all',uid(),$friday);},409,'Wheel handles exhausted pool');
 mutate($t,'redeem',['userId'=>'u1','rewardId'=>'r1','requestId'=>'reward-request-12345'],$friday);
 ok(balance($t,'u1')===$earned-100&&earned($t,'u1')===$earned,'Reward spends balance without reducing lifetime score');
 ok(snapshot($t,$friday)['users'][0]['goal']===null,'Claimed target clears so a new goal can be chosen');
 rejects(function()use(&$t){mutate($t,'redeem',['userId'=>'u1','rewardId'=>'r1','requestId'=>'reward-request-12345']);},409,'Reward retry cannot spend twice');
-rejects(function()use(&$t){mutate($t,'redeem',['userId'=>'u2','rewardId'=>'r1','requestId'=>'reward-request-12346']);},409,'Insufficient funds rejected');
+rejects(function()use(&$t){mutate($t,'redeem',['userId'=>'u2','rewardId'=>array_values(array_filter($t['rewards'],fn($r)=>$r['ownerId']==='u2'))[0]['id'],'requestId'=>'reward-request-12346']);},409,'Insufficient funds rejected');
 mutate($t,'deleteReward',['id'=>'r1']);ok(balance($t,'u1')===$earned-100,'Deleting reward preserves redeemed history');
 $legacy=$t;unset($legacy['assignments']);$legacy['version']=1;$upgraded=upgrade_state($legacy);
 ok($upgraded['assignments']===[]&&$upgraded['tasks']===$legacy['tasks']&&$upgraded['users']===$legacy['users']&&balance($upgraded,'u1')===balance($legacy,'u1'),'Version 1 migration preserves all existing data and points');
-foreach([-5,0,1.5,'20',100001]as $v)rejects(function()use(&$s,$v){mutate($s,'saveTask',['title'=>'Invalid','points'=>$v,'frequency'=>'daily']);},400,'Invalid points: '.json_encode($v));
+foreach([-5,0,1.5,'20',100001]as $v)rejects(function()use(&$s,$v){mutate($s,'saveTask',['ownerId'=>'u1','title'=>'Invalid','points'=>$v,'frequency'=>'daily']);},400,'Invalid points: '.json_encode($v));
 rejects(function()use(&$s){mutate($s,'saveUser',['id'=>'intruder','name'=>'X','avatar'=>'X']);},404,'Cannot create fifth profile');
 $t=initial_state();goal($t);$t['tasks']=[];rejects(function()use(&$t){spin($t,'u1','all',uid());},409,'Empty wheel handled');
 

@@ -15,6 +15,6 @@ jobs:
         with:
           node-version: '22'
       - run: find app public tests -name '*.php' -exec php -l {} \;
-      - run: php tests/domain.php && php tests/store.php && php tests/accounts.php
+      - run: php tests/domain.php && php tests/store.php && php tests/accounts.php && php tests/personal-catalogs.php
       - run: node --check public/app.js
       - run: node tests/http.mjs

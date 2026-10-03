@@ -35,6 +35,7 @@ APP_ENV=development php -S localhost:3000 -t public
 php tests/domain.php
 php tests/store.php
 php tests/accounts.php
+php tests/personal-catalogs.php
 node --check public/app.js
 node tests/http.mjs
 find app public tests -name '*.php' -exec php -l {} \;
@@ -83,3 +84,9 @@ Ana HTML PHP üzerinden önbelleksiz sunulur; JavaScript ve CSS adresleri içeri
 Eski veriler otomatik olarak korunur. Önceki ortak oturum yalnızca geçiş formunu açabilir; hesaplar kurulana kadar görev/puan yazmaları durdurulur. Geçiş tek işlemle dört hesabı oluşturur, Baba'ya admin rolü verir ve eski ortak oturumları geçersiz kılar. Şifre hashleri hiçbir API yanıtına dahil edilmez. Admin şifre yenilediğinde ilgili hesabın açık oturumları bir sonraki istekte sona erer.
 
 Tamamladım → kullanıcı başka bir üyeyi seçer → görev `pending` olur. Bu aşamada puan eklenmez ve aynı görev yeniden çarkta görünmez. Yalnızca seçilen onaycı onaylayabilir veya geri gönderebilir. Sunucu süresinden önce gönderilen görevin onayı daha sonra verilse de puan geçerlidir. Yarışma hesabında onaya gönderilme zamanı esas alınır; onay gelene kadar puan toplamı artmaz. Geri gönderilen görev, asıl son tarihi dolmadıysa yeniden gönderilebilir; son tarih uzatılmaz. Tekrarlanan onaylar ikinci kez puan vermez.
+
+## Sürüm 5: kişiye özel görev ve ödüller
+
+Admin panelinde Görevler veya Ödüller sekmesine girip kişi seçin. Her kaydın zorunlu bir sahibi vardır; üyeler yalnızca kendi görev havuzunu ve ödüllerini alır. Admin kendi kişisel çarkında ve ödül mağazasında da yalnızca kendi kayıtlarını kullanır. Başkasının ödül kimliği ile hedef seçme veya ödül alma sunucuda reddedilir. Aile yarışmasının ortak büyük ödülü bu kişisel kataloglardan ayrıdır.
+
+Eski ortak şablonlar her üye için bağımsız kişisel kopyalara ayrılır. Kopyaların kimlikleri kararlıdır; tekrar okuma/yayınlama yeni kopya üretmez. Mevcut hedef, atama ve geçmiş referansları ilgili kişisel kayda taşınır; puanlar, son tarihler, onaycılar ve geçmiş tutarlar korunur. Böylece başlangıçta aynı olan örnekler kullanıcı bazında bağımsız düzenlenip silinebilir. Bir kaydın kişisini değiştirmek yeni seçimleri etkiler; önceden alınmış görevlerin sabit puan ve süreleri korunur.

@@ -23,16 +23,18 @@ try{
  const setup=(await request('state')).body;assert.equal(setup.setupRequired,true);assert.equal(setup.profiles.length,4);
  const accounts=setup.profiles.map((u,i)=>({id:u.id,name:i===0?'Baba':['','Anne','Ada','Efe'][i],username:'member'+(i+1),password:'test-password-123'}));
  const activation=await request('setupAccounts',{adminId:'u1',accounts});assert.equal(activation.status,200);csrf=activation.body.csrf;
- const initial=activation.body.state;assert.equal(initial.viewerId,'u1');assert.equal(initial.viewerRole,'admin');assert.equal(initial.users.length,4);assert.equal(initial.tasks.length,10);
+ const initial=activation.body.state;assert.equal(initial.viewerId,'u1');assert.equal(initial.viewerRole,'admin');assert.equal(initial.users.length,4);assert.equal(initial.tasks.length,40);
  assert.ok(!JSON.stringify(initial).includes('passwordHash'));
  const admin={cookie,csrf};
  async function loginAs(n){cookie='';csrf=(await request('session')).body.csrf;const r=await request('login',{username:'member'+n,password:'test-password-123'});assert.equal(r.status,200);csrf=r.body.csrf;return {cookie,csrf};}
  const member=await loginAs(2),other=await loginAs(3);
  function use(client){cookie=client.cookie;csrf=client.csrf;}
  use(member);
+ const ownState=(await request('state')).body.state;const ownReward=ownState.rewards[0].id;assert.equal(ownState.tasks.length,10);assert.equal(ownState.rewards.length,4);assert.ok(ownState.tasks.every(t=>t.ownerId==='u2'));assert.ok(ownState.rewards.every(r=>r.ownerId==='u2'));
+ assert.equal((await request('selectGoal',{rewardId:'r1'})).status,403);assert.equal((await request('redeem',{rewardId:'r1',requestId:'other-reward-123456'})).status,403);
  for(const action of ['saveTask','deleteTask','saveReward','deleteReward','saveUser','saveAccount','createCompetition','cancelCompetition','claimCompetition'])assert.equal((await request(action,{})).status,403,action+' requires admin');
  assert.equal((await request('spin',{userId:'u1',frequency:'all',requestId:'spoof-draw-12345678'})).status,403);
- assert.equal((await request('selectGoal',{rewardId:'r1'})).status,200);
+ assert.equal((await request('selectGoal',{rewardId:ownReward})).status,200);
  const draws=await Promise.all([request('spin',{frequency:'daily',requestId:'same-draw-1234567890'}),request('spin',{frequency:'daily',requestId:'same-draw-1234567890'})]);
  assert.deepEqual(draws.map(r=>r.status),[200,200]);assert.equal(draws[0].body.assignment.id,draws[1].body.assignment.id);
  const a=draws[0].body.assignment;assert.equal(Date.parse(a.dueAt)-Date.parse(a.assignedAt),86400000);
@@ -48,16 +50,16 @@ try{
  const approvals=await Promise.all([request('reviewAssignment',{assignmentId:a.id,decision:'approve'}),request('reviewAssignment',{assignmentId:a.id,decision:'approve'})]);assert.deepEqual(approvals.map(r=>r.status).sort(),[200,409]);
  assert.equal((await request('state')).body.state.users.find(u=>u.id==='u2').balance,a.points);
  // Admin can manage templates without rewriting historical assignment values.
- const added=await request('saveTask',{title:'Approval task',description:'',points:100,icon:'✨',frequency:'monthly'});assert.equal(added.status,200);const task=added.body.state.tasks.at(-1);
+ const added=await request('saveTask',{ownerId:'u2',title:'Approval task',description:'',points:100,icon:'✨',frequency:'monthly'});assert.equal(added.status,200);const task=added.body.state.tasks.at(-1);
  for(const t of initial.tasks)assert.equal((await request('deleteTask',{id:t.id})).status,200);
  use(member);const frozen=(await request('spin',{frequency:'monthly',requestId:'monthly-draw-1234567'})).body.assignment;
  use(admin);await request('saveTask',{...task,points:200});await request('deleteTask',{id:task.id});
  use(member);assert.equal((await request('complete',{assignmentId:frozen.id,reviewerId:'u1'})).status,200);
  use(admin);assert.equal((await request('reviewAssignment',{assignmentId:frozen.id,decision:'approve'})).status,200);
- use(member);const claims=await Promise.all([request('redeem',{rewardId:'r1',requestId:'redemption-12345678'}),request('redeem',{rewardId:'r1',requestId:'redemption-12345678'})]);assert.deepEqual(claims.map(r=>r.status).sort(),[200,409]);
+ use(member);const claims=await Promise.all([request('redeem',{rewardId:ownReward,requestId:'redemption-12345678'}),request('redeem',{rewardId:ownReward,requestId:'redemption-12345678'})]);assert.deepEqual(claims.map(r=>r.status).sort(),[200,409]);
  state=(await request('state')).body.state;assert.equal(state.users.find(u=>u.id==='u2').balance,a.points);assert.equal(state.completions.length,2);
  use(admin);const contest=(await request('createCompetition',{title:'Aile yarışı',prize:'Piknik',target:80,frequency:'weekly'})).body.state.competitions.at(-1);
- await request('saveTask',{title:'Ortak görev',description:'',points:80,icon:'✨',frequency:'daily'});
+ await request('saveTask',{ownerId:'u3',title:'Ortak görev',description:'',points:80,icon:'✨',frequency:'daily'});
  use(other);const shared=(await request('spin',{frequency:'daily',requestId:'shared-draw-1234567'})).body.assignment;
  assert.equal((await request('complete',{assignmentId:shared.id,reviewerId:'u2'})).status,200);
  use(member);const won=await request('reviewAssignment',{assignmentId:shared.id,decision:'approve'});assert.equal(won.body.state.familyGoal.total,80);

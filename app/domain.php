@@ -7,7 +7,29 @@ function upgrade_state(array $state): array {
     // Additive migration: never overwrite profiles, scores, tasks or reward history.
     $state['assignments'] ??= [];
     $state['competitions'] ??= [];
-    $state['version'] = 4;
+    // Split legacy shared templates into independently editable personal copies.
+    $maps=['tasks'=>[],'rewards'=>[]];
+    foreach(['tasks','rewards'] as $kind){
+        $items=[];
+        foreach($state[$kind] as $item){
+            if(isset($item['ownerId'])){$items[]=$item;continue;}
+            foreach($state['users'] as $index=>$u){
+                $id=$index===0?$item['id']:substr(hash('sha256','personal-v5:'.$kind.':'.$item['id'].':'.$u['id']),0,32);
+                $maps[$kind][$item['id']][$u['id']]=$id;
+                $items[]=array_merge($item,['id'=>$id,'ownerId'=>$u['id']]);
+            }
+        }
+        $state[$kind]=$items;
+    }
+    foreach($state['users'] as &$u)if(isset($maps['rewards'][$u['goalRewardId']??''][$u['id']]))$u['goalRewardId']=$maps['rewards'][$u['goalRewardId']][$u['id']];unset($u);
+    foreach(['assignments','completions','redemptions'] as $kind){
+        foreach($state[$kind] as &$row){
+            foreach(['taskId'=>'tasks','rewardId'=>'rewards','goalRewardId'=>'rewards'] as $field=>$source){
+                if(isset($maps[$source][$row[$field]??''][$row['userId']]))$row[$field]=$maps[$source][$row[$field]][$row['userId']];
+            }
+        }unset($row);
+    }
+    $state['version'] = 5;
     return $state;
 }
 function initial_state(): array { return upgrade_state(json_decode(file_get_contents(__DIR__.'/seed.json'), true, 512, JSON_THROW_ON_ERROR)); }
@@ -37,6 +59,7 @@ function is_done(array $state, string $userId, array $task, ?DateTimeImmutable $
 }
 function available_tasks(array $state,string $userId,string $frequency='all',?DateTimeImmutable $now=null): array {
     return array_values(array_filter($state['tasks'],function($t)use($state,$userId,$frequency,$now){
+        if(($t['ownerId']??null)!==$userId)return false;
         if($frequency!=='all'&&$t['frequency']!==$frequency)return false;
         if(is_done($state,$userId,$t,$now))return false;
         foreach($state['assignments']??[] as $a){
@@ -69,13 +92,13 @@ function family_goal(array $state,?DateTimeImmutable $now=null): ?array {
 function earned(array $state, string $id): int { return array_sum(array_column(array_filter($state['completions'],fn($c)=>$c['userId']===$id),'points')); }
 function balance(array $state, string $id): int { return earned($state,$id)-array_sum(array_column(array_filter($state['redemptions'],fn($c)=>$c['userId']===$id),'cost')); }
 function snapshot(array $state, ?DateTimeImmutable $now=null): array {
-    $result=upgrade_state($state);$result['competitions']=array_map(fn($c)=>competition_snapshot($state,$c,$now),$result['competitions']);$result['familyGoal']=family_goal($state,$now); $result['today']=now_tr($now)->format('Y-m-d');$result['serverNow']=now_tr($now)->format(DateTimeInterface::ATOM);
+    $state=upgrade_state($state);$result=$state;$result['competitions']=array_map(fn($c)=>competition_snapshot($state,$c,$now),$result['competitions']);$result['familyGoal']=family_goal($state,$now); $result['today']=now_tr($now)->format('Y-m-d');$result['serverNow']=now_tr($now)->format(DateTimeInterface::ATOM);
     foreach($result['assignments'] as &$a)$a['status']=assignment_status($a,$now);unset($a);
     foreach($result['users'] as &$u) {
         $u['earned']=earned($state,$u['id']); $u['balance']=balance($state,$u['id']);
         $u['doneIds']=array_values(array_column(array_filter($state['tasks'],fn($t)=>is_done($state,$u['id'],$t,$now)),'id'));
         $u['eligibleTaskIds']=array_column(available_tasks($result,$u['id'],'all',$now),'id');
-        $u['goal']=null;foreach($state['rewards'] as $r)if($r['id']===($u['goalRewardId']??null))$u['goal']=$r;
+        $u['goal']=null;foreach($state['rewards'] as $r)if($r['id']===($u['goalRewardId']??null)&&($r['ownerId']??null)===$u['id'])$u['goal']=$r;
     }unset($u);
     return $result;
 }
@@ -91,16 +114,18 @@ function mutate(array &$state,string $action,array $in,?DateTimeImmutable $now=n
     switch($action){
     case 'saveTask': case 'saveReward':
         $task=$action==='saveTask'; $key=$task?'tasks':'rewards'; $points=$task?'points':'cost';
-        $value=['title'=>valid_text($in['title']??null,'Ad',80),'description'=>valid_text($in['description']??'','Açıklama',240,false),$points=>valid_points($in[$points]??null),'icon'=>valid_text($in['icon']??($task?'✨':'🎁'),'Simge',12)];
+        $owner=valid_text($in['ownerId']??null,'Görevin veya ödülün sahibi',64);find_index($state['users'],$owner,'Kullanıcı');
+        $value=['ownerId'=>$owner,'title'=>valid_text($in['title']??null,'Ad',80),'description'=>valid_text($in['description']??'','Açıklama',240,false),$points=>valid_points($in[$points]??null),'icon'=>valid_text($in['icon']??($task?'✨':'🎁'),'Simge',12)];
         if($task){if(!in_array($in['frequency']??null,['daily','weekly','monthly'],true))throw new AppError('Görev dönemi geçersiz.');$value['frequency']=$in['frequency'];}
         if(isset($in['id'])){$i=find_index($state[$key],$in['id'],'Kayıt');$state[$key][$i]=array_merge($state[$key][$i],$value);}
-        else{if(count($state[$key])>=100)throw new AppError('En fazla 100 aktif kayıt ekleyebilirsiniz.');$state[$key][]=['id'=>uid()]+$value;} break;
+        else{if(count(array_filter($state[$key],fn($r)=>$r['ownerId']===$owner))>=100)throw new AppError('Bir kişiye en fazla 100 aktif kayıt ekleyebilirsiniz.');$state[$key][]=['id'=>uid()]+$value;} break;
     case 'deleteTask': case 'deleteReward':
         $key=$action==='deleteTask'?'tasks':'rewards'; $i=find_index($state[$key],$in['id']??null,'Kayıt');array_splice($state[$key],$i,1);break;
     case 'saveUser':
         $i=find_index($state['users'],$in['id']??null,'Kullanıcı');$state['users'][$i]['name']=valid_text($in['name']??null,'İsim',30);$state['users'][$i]['avatar']=valid_text($in['avatar']??null,'Simge',12);break;
     case 'selectGoal':
-        $i=find_index($state['users'],$in['userId']??null,'Kullanıcı');find_index($state['rewards'],$in['rewardId']??null,'Ödül');
+        $i=find_index($state['users'],$in['userId']??null,'Kullanıcı');$r=$state['rewards'][find_index($state['rewards'],$in['rewardId']??null,'Ödül')];
+        if($r['ownerId']!==$in['userId'])throw new AppError('Bu ödül sana ait değil.',403);
         $state['users'][$i]['goalRewardId']=$in['rewardId'];$state['users'][$i]['goalSelectedAt']=$at;break;
     case 'createCompetition':
         if(count($state['competitions'])>=100)throw new AppError('En fazla 100 yarışma kaydı oluşturulabilir.');
@@ -141,6 +166,7 @@ function mutate(array &$state,string $action,array $in,?DateTimeImmutable $now=n
         $state['completions'][]=['id'=>uid(),'assignmentId'=>$a['id'],'userId'=>$a['userId'],'taskId'=>$a['taskId'],'title'=>$a['title'],'icon'=>$a['icon'],'points'=>$a['points'],'frequency'=>$a['frequency'],'day'=>substr($a['submittedAt'],0,10),'at'=>$a['submittedAt'],'approvedAt'=>$at,'approvedBy'=>$in['actorId'],'dueAt'=>$a['dueAt'],'goalTitle'=>$a['goalTitle']];break;
     case 'redeem':
         $i=find_index($state['users'],$in['userId']??null,'Kullanıcı');$reward=$state['rewards'][find_index($state['rewards'],$in['rewardId']??null,'Ödül')];
+        if($reward['ownerId']!==$in['userId'])throw new AppError('Bu ödül sana ait değil.',403);
         valid_request($in['requestId']??null);
         foreach($state['redemptions'] as $r)if($r['requestId']===$in['requestId'])throw new AppError('Bu işlem zaten kaydedildi.',409);
         if(balance($state,$in['userId'])<$reward['cost'])throw new AppError('Bu ödül için henüz yeterli puanın yok.',409);
@@ -158,7 +184,7 @@ function spin(array &$state,string $userId,string $frequency,string $requestId,?
         // Retrying a lost response returns the original assignment, without a second draw.
         $task=['id'=>$a['taskId']]+$a;return ['task'=>$task,'assignment'=>$a,'candidates'=>[$task]];
     }
-    $goal=null;foreach($state['rewards'] as $r)if($r['id']===($u['goalRewardId']??null))$goal=$r;
+    $goal=null;foreach($state['rewards'] as $r)if($r['id']===($u['goalRewardId']??null)&&($r['ownerId']??null)===$u['id'])$goal=$r;
     if(!$goal){$family=family_goal($state,$now);if($family)$goal=['id'=>$family['id'],'title'=>$family['prize']];}
     if(!$goal)throw new AppError('Bir hedef ödül seç veya ortak ödüllü aile yarışması başlat.',409);
     $list=available_tasks($state,$userId,$frequency,$now);
