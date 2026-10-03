@@ -52,6 +52,7 @@ function deadline(string $frequency, ?DateTimeImmutable $now=null): DateTimeImmu
 }
 function assignment_status(array $assignment,?DateTimeImmutable $now=null): string {
     if(in_array($assignment['status']??'active',['completed','cancelled','pending'],true))return $assignment['status'];
+    if(isset($assignment['routineId'],$assignment['routineDay']))return now_tr($now)->format('Y-m-d')>$assignment['routineDay']?'expired':'active';
     return now_tr($now)>=new DateTimeImmutable($assignment['dueAt'])?'expired':'active';
 }
 function is_done(array $state, string $userId, array $task, ?DateTimeImmutable $now = null): bool {
@@ -182,9 +183,9 @@ function mutate(array &$state,string $action,array $in,?DateTimeImmutable $now=n
             $state['assignments'][$i]['status']='active';$state['assignments'][$i]['rejectedAt']=$at;
             unset($state['assignments'][$i]['submittedAt'],$state['assignments'][$i]['reviewerId']);break;
         }
-        if(new DateTimeImmutable($a['submittedAt'])>=new DateTimeImmutable($a['dueAt']))throw new AppError('Görev süresinde gönderilmemiş.',409);
+        if(!isset($a['routineId'])&&new DateTimeImmutable($a['submittedAt'])>=new DateTimeImmutable($a['dueAt']))throw new AppError('Görev süresinde gönderilmemiş.',409);
         $state['assignments'][$i]['status']='completed';$state['assignments'][$i]['completedAt']=$at;
-        $state['completions'][]=['id'=>uid(),'assignmentId'=>$a['id'],'userId'=>$a['userId'],'taskId'=>$a['taskId'],'title'=>$a['title'],'icon'=>$a['icon'],'points'=>$a['points'],'frequency'=>$a['frequency'],'day'=>substr($a['submittedAt'],0,10),'at'=>$a['submittedAt'],'approvedAt'=>$at,'approvedBy'=>$in['actorId'],'dueAt'=>$a['dueAt'],'goalTitle'=>$a['goalTitle']];break;
+        $state['completions'][]=['id'=>uid(),'assignmentId'=>$a['id'],'userId'=>$a['userId'],'taskId'=>$a['taskId'],'title'=>$a['title'],'icon'=>$a['icon'],'points'=>$a['points'],'frequency'=>$a['frequency'],'day'=>substr($a['submittedAt'],0,10),'at'=>$a['submittedAt'],'submittedLate'=>$a['submittedLate']??false,'approvedAt'=>$at,'approvedBy'=>$in['actorId'],'dueAt'=>$a['dueAt'],'goalTitle'=>$a['goalTitle']];break;
     case 'redeem':
         $i=find_index($state['users'],$in['userId']??null,'Kullanıcı');$reward=$state['rewards'][find_index($state['rewards'],$in['rewardId']??null,'Ödül')];
         if($reward['ownerId']!==$in['userId'])throw new AppError('Bu ödül sana ait değil.',403);

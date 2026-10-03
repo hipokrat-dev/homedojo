@@ -15,7 +15,7 @@ $at=new DateTimeImmutable('2026-10-03T08:00:00+03:00');$plan=daily_routines($s,$
 check(daily_routines($s,$kid,new DateTimeImmutable('2026-10-03T05:00:00Z'))===$plan,'Istanbul timezone');
 $in=['routineId'=>'bed','day'=>'2026-10-03'];denied(function()use(&$s,$kid,$in,$at){complete_routine($s,$kid,$in+['userId'=>'u2'],$at);},403);
 denied(function()use(&$s,$kid,$at){complete_routine($s,$kid,['routineId'=>'sleep','day'=>'2026-10-03'],$at);},409);
-denied(function()use(&$s,$kid,$in){complete_routine($s,$kid,$in,new DateTimeImmutable('2026-10-03T12:00:00+03:00'));},409);
+$lateState=$s;complete_routine($lateState,$kid,$in,new DateTimeImmutable('2026-10-03T12:00:00+03:00'));$late=end($lateState['assignments']);check($late['submittedLate']===true,'Late routine submission remains available');mutate($lateState,'reviewAssignment',['actorId'=>'u1','assignmentId'=>$late['id'],'decision'=>'approve'],new DateTimeImmutable('2026-10-05T09:00:00+03:00'));check(balance($lateState,$id)===10,'Late daily routine can be approved days later');
 denied(function()use(&$s,$kid,$at){complete_routine($s,$kid,['routineId'=>'bed','day'=>'2026-10-02'],$at);},409);
 complete_routine($s,$kid,$in+['points'=>99999,'reviewerId'=>'u2'],$at);complete_routine($s,$kid,$in,$at);
 check(count($s['assignments'])===1,'Double tap creates one assignment');$a=$s['assignments'][0];check($a['points']===10&&$a['reviewerId']==='u1','Server owns points and guardian');check(balance($s,$id)===0,'Submission gives no points');
@@ -42,7 +42,7 @@ $kid=$s['users'][find_index($s['users'],$id,'K')];complete_routine($s,$kid,['rou
 check(end($s['assignments'])['reviewerId']==='u2','Configured parent receives review');archive_account($s,$admin,['id'=>'u2']);
 check(end($s['assignments'])['reviewerId']==='u1','Parent archive reroutes pending review');check($s['users'][find_index($s['users'],$id,'K')]['guardianId']==='u1','Dependent child gets admin guardian');
 $session=['userId'=>'u2','authVersion'=>1,'expires'=>time()+100];check(actor_for($s,$session)===null,'Archived parent session rejected');
-check(count(array_filter(daily_routines($s,$kid,new DateTimeImmutable('2026-10-03T23:59:00+03:00')),fn($r)=>$r['status']==='active'))===0,'No routine available past evening cutoff');
+check(count(array_filter(daily_routines($s,$kid,new DateTimeImmutable('2026-10-03T23:59:00+03:00')),fn($r)=>$r['status']==='active'))>0,'Routines remain available past evening cutoff');
 denied(function()use(&$s){restore_account($s,['id'=>'u1']);},409);
 $adminEdit=['id'=>'u1','username'=>$admin['username'],'name'=>'Baba','avatar'=>'🌻','memberType'=>'child'];denied(function()use(&$s,$adminEdit){save_account($s,$adminEdit);},400);
 $scenario=$s;restore_account($scenario,['id'=>'u2']);$t=new DateTimeImmutable('2026-10-03T09:00:00+03:00');

@@ -33,7 +33,7 @@ function child_progress(array $s,array $actor,array $in,?DateTimeImmutable $now=
                 foreach(routine_program_on($u,$day) as $r){
                     $starts=new DateTimeImmutable($day.'T'.$r['time'].':00+03:00');$due=new DateTimeImmutable($day.'T'.$r['until'].':00+03:00');
                     if($starts>$now||isset($u['routineTrackingAt'])&&$due<=new DateTimeImmutable($u['routineTrackingAt']))continue;
-                    $occurrences[$day.':'.$r['id']]=['id'=>$r['id'],'day'=>$day,'title'=>$r['title'],'icon'=>$r['icon'],'time'=>$r['time'],'status'=>$now>=$due?'expired':'active'];
+                    $occurrences[$day.':'.$r['id']]=['id'=>$r['id'],'day'=>$day,'title'=>$r['title'],'icon'=>$r['icon'],'time'=>$r['time'],'status'=>$day<$now->format('Y-m-d')?'expired':'active'];
                 }
             }
             // Frozen submissions remain reportable even if a template is edited or removed.

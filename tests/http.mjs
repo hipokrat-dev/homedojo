@@ -129,6 +129,15 @@ try{
  use(admin);const progress=await request('progress&mode=week&date='+olderPlan.today+'&childId=u3&source=daily');assert.equal(progress.status,200);assert.equal(progress.body.report.rows.length,1);assert.equal(progress.body.report.rows[0].userId,'u3');assert.ok(!JSON.stringify(progress.body).includes('passwordHash'));assert.equal((await request('progress&date=2026-02-30')).status,400);
  const anne=(await request('state')).body.state.users.find(u=>u.id==='u2');assert.equal((await request('saveAccount',{id:'u2',name:anne.name,username:anne.username,avatar:anne.avatar,memberType:'parent'})).status,200);
  cookie='';csrf=(await request('session')).body.csrf;const parentLogin=await request('login',{username:'member2',password:'new-fixture-password'});assert.equal(parentLogin.status,200);csrf=parentLogin.body.csrf;assert.equal((await request('progress&mode=day&date='+olderPlan.today)).status,200,'Nonadmin parent can inspect progress');assert.equal((await request('saveRoutines',{id:'u3',routines:[]})).status,403,'Report access does not grant admin rights');
+ const lateTestParent={cookie,csrf};
+ // Daily schedule time is advisory: late submissions still need guardian approval.
+ use(admin);assert.equal((await request('saveRoutines',{id:'u3',routines:[{id:'late-day',title:'Late daily task',icon:'📚',time:'00:00',until:'00:01',points:17}]})).status,200);
+ use(other);const latePlan=(await request('state')).body.state;
+ if(latePlan.dailyRoutines[0].late){
+  assert.equal(latePlan.dailyRoutines[0].status,'active');const lateSubmit=await request('completeRoutine',{routineId:'late-day',day:latePlan.today});assert.equal(lateSubmit.status,200);const lateTask=lateSubmit.body.state.assignments.find(a=>a.routineId==='late-day');assert.equal(lateTask.submittedLate,true);
+  use(admin);assert.equal((await request('reviewAssignment',{assignmentId:lateTask.id,decision:'approve'})).status,200);
+ }
+ use(lateTestParent);
  // Child reward requests: nonadmin parent pricing, concurrent review and privacy.
  const wishParent={cookie,csrf};use(other);
  const wishInput={requestId:'wish-http-request-12345',title:'Aile sineması',icon:'🎬',parentId:'u2',cost:1,childId:'u4'};

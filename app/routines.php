@@ -28,12 +28,13 @@ function daily_routines(array $s,array $u,?DateTimeImmutable $now=null): array {
     foreach($u['routineSchedule']??default_routines() as $r){
         $start=new DateTimeImmutable($day.'T'.$r['time'].':00+03:00');$end=new DateTimeImmutable($day.'T'.$r['until'].':00+03:00');
         $r['startsAt']=$start->format(DateTimeInterface::ATOM);$r['dueAt']=$end->format(DateTimeInterface::ATOM);
-        $r['status']=$now<$start?'upcoming':($now>=$end?'expired':'active');
+        $r['status']=$now<$start?'upcoming':'active';
         foreach($s['assignments'] as $a)if($a['userId']===$u['id']&&($a['routineId']??null)===$r['id']&&($a['routineDay']??null)===$day){
             // Keep already submitted task content and deadlines stable if the admin edits the schedule.
             foreach(['title','icon','points','dueAt'] as $key)$r[$key]=$a[$key];
             $r['time']=$a['routineTime']??$r['time'];$r['status']=assignment_status($a,$now);$r['assignmentId']=$a['id'];break;
         }
+        $r['late']=$now>=new DateTimeImmutable($r['dueAt']);
         $rows[]=$r;
     }
     usort($rows,fn($a,$b)=>strcmp($a['time'],$b['time']));return $rows;
@@ -64,5 +65,5 @@ function complete_routine(array &$s,array $actor,array $in,?DateTimeImmutable $n
     else{
         $i=count($s['assignments']);$s['assignments'][]=['id'=>uid(),'requestId'=>'routine-'.uid(),'userId'=>$u['id'],'taskId'=>'routine-'.$r['id'],'routineId'=>$r['id'],'routineDay'=>$day,'routineTime'=>$r['time'],'title'=>$r['title'],'icon'=>$r['icon'],'description'=>'Günlük küçük adım · '.$r['time'],'points'=>$r['points'],'frequency'=>'daily','periodStart'=>$day,'assignedAt'=>$at,'dueAt'=>$r['dueAt'],'goalRewardId'=>null,'goalTitle'=>'Günlük küçük adımlar'];
     }
-    $s['assignments'][$i]=array_merge($s['assignments'][$i],['status'=>'pending','submittedAt'=>$at,'reviewerId'=>$guardian['id']]);
+    $s['assignments'][$i]=array_merge($s['assignments'][$i],['status'=>'pending','submittedAt'=>$at,'submittedLate'=>$now>=new DateTimeImmutable($r['dueAt']),'reviewerId'=>$guardian['id']]);
 }
