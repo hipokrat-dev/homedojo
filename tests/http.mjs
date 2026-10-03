@@ -41,7 +41,7 @@ try{
  use(member);
  const ownState=(await request('state')).body.state;const ownReward=ownState.rewards[0].id;assert.equal(ownState.tasks.length,10);assert.equal(ownState.rewards.length,4);assert.ok(ownState.tasks.every(t=>t.ownerId==='u2'));assert.ok(ownState.rewards.every(r=>r.ownerId==='u2'));
  assert.equal((await request('selectGoal',{rewardId:'r1'})).status,403);assert.equal((await request('redeem',{rewardId:'r1',requestId:'other-reward-123456'})).status,403);
- for(const action of ['saveTask','deleteTask','saveReward','deleteReward','saveUser','saveAccount','createCompetition','cancelCompetition','claimCompetition'])assert.equal((await request(action,{})).status,403,action+' requires admin');
+ for(const action of ['deleteTask','saveReward','deleteReward','saveUser','saveAccount','createCompetition','cancelCompetition','claimCompetition'])assert.equal((await request(action,{})).status,403,action+' requires admin');
  assert.equal((await request('spin',{userId:'u1',frequency:'all',requestId:'spoof-draw-12345678'})).status,403);
  assert.equal((await request('selectGoal',{rewardId:ownReward})).status,200);
  const draws=await Promise.all([request('spin',{frequency:'daily',requestId:'same-draw-1234567890'}),request('spin',{frequency:'daily',requestId:'same-draw-1234567890'})]);
@@ -161,6 +161,11 @@ try{
   use(earlyParent);const earlyResults=await Promise.all([request('parentApproveRoutine',{childId:'u3',routineId:'early-check',day:earlyState.today}),request('parentApproveRoutine',{childId:'u3',routineId:'early-check',day:earlyState.today})]);assert.deepEqual(earlyResults.map(r=>r.status),[200,200]);
   use(other);const earlyCompletions=(await request('state')).body.state.completions.filter(c=>c.taskId==='routine-early-check');assert.equal(earlyCompletions.length,1);assert.equal(earlyCompletions[0].submittedEarly,true);
  }use(earlyParent);
+ // A nonadmin parent can add personal/shared tasks without gaining admin edits.
+ const poolParent={cookie,csrf};const poolTask=await request('saveTask',{ownerId:'u3',title:'Parent-added task',description:'',points:18,icon:'📚',frequency:'daily'});assert.equal(poolTask.status,200);const createdPool=poolTask.body.state.taskPool.find(t=>t.title==='Parent-added task');assert.ok(createdPool);
+ assert.equal((await request('saveTask',{...createdPool,points:99})).status,403);assert.equal((await request('deleteTask',{id:createdPool.id})).status,403);
+ assert.equal((await request('saveTask',{scope:'shared',participantIds:['u3','u4'],title:'Shared parent task',points:14,icon:'✨',frequency:'daily'})).status,200);
+ use(other);assert.ok((await request('state')).body.state.tasks.some(t=>t.id===createdPool.id));assert.deepEqual((await request('state')).body.state.taskPool,[]);assert.equal((await request('saveTask',{ownerId:'u3',title:'Forbidden',points:99,frequency:'daily'})).status,403);use(poolParent);
  // Child reward requests: nonadmin parent pricing, concurrent review and privacy.
  const wishParent={cookie,csrf};use(other);
  const wishInput={requestId:'wish-http-request-12345',title:'Aile sineması',icon:'🎬',parentId:'u2',cost:1,childId:'u4'};

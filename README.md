@@ -143,3 +143,5 @@ Ebeveynlerin Sayfam ekranında aktif çocukların günlük programları bulunur.
 Ebeveyn ana ekranı günlük görevler ve doğrudan onay içindir; takip ekranında gün, hafta veya en fazla bir yıllık tarih aralığı seçilir. Kullanıcı türleri Ebeveyn, Büyük çocuk ve Küçük çocuk olarak gösterilir. Çocuk menüsünde aile panosu, onaylar ve ödül kataloğu bulunmaz. Büyük çocuk görev onayını yalnızca ebeveynden isteyebilir. Ebeveyn günlük veya çark görevlerini istek gelmeden de onaylayabilir. Yeni çark görevleri tüm havuzdan seçilir, ödül seçme önkoşulu ve süre sınırı yoktur; eski görevlerin kayıtları korunur.
 
 Ebeveyn, bugünkü günlük görevleri başlangıç saati gelmeden de doğrudan onaylayabilir. Gerçek işlem zamanı ve erken onay bilgisi kaydedilir. Çocuğun kendi gönderiminde başlangıç saati kuralı sürer.
+
+Anne dahil ebeveynler Görev havuzu ekranından çocuklara özel veya ortak görev ekleyebilir. Mevcut görevleri düzenleme/silme ve kullanıcı yönetimi admin yetkisinde kalır.

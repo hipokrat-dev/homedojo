@@ -29,6 +29,13 @@ function actor_for(array $s,array $session): ?array {
 }
 function authorize_action(array $s,array $actor,string $action,array &$in): void {
     if($action==='reviewAssignment'&&($actor['memberType']??'')!=='parent')throw new AppError('Görevleri yalnızca ebeveyn onaylayabilir.',403);
+    if($action==='saveTask'&&($actor['memberType']??'')==='parent'&&($actor['role']??'')!=='admin'){
+        if(isset($in['id']))throw new AppError('Mevcut görevleri yalnızca admin düzenleyebilir.',403);
+        $ids=($in['scope']??'personal')==='shared'?($in['participantIds']??[]):[$in['ownerId']??null];
+        if(!is_array($ids)||!$ids)throw new AppError('Görevin çocuklarını seç.');
+        foreach($ids as $id){$child=$s['users'][active_user_index($s,$id,'Çocuk')];if(!has_daily_program($child))throw new AppError('Çocuk profili seç.',403);}
+        return;
+    }
     $admin=['saveTask','deleteTask','saveReward','deleteReward','saveUser','createCompetition','cancelCompetition','claimCompetition','saveAccount','createAccount','archiveAccount','restoreAccount','saveRoutines'];
     if(in_array($action,$admin,true)&&($actor['role']??'member')!=='admin')throw new AppError('Bu işlem yalnızca admin hesabına açık.',403);
     if(($actor['memberType']??'')==='young_child'&&in_array($action,['spin','selectGoal','complete','redeem','cancelAssignment','reviewAssignment'],true))throw new AppError('Küçük çocuk hesabında günlük görev ekranını kullan.',403);
@@ -53,6 +60,7 @@ function member_snapshot(array $s,array $actor): array {
     if(has_daily_program($actor)){$v['dailyRoutines']=daily_routines($s,$actor);$v['guardianName']=routine_guardian($s,$actor)['name'];}
     $v['rewardWishes']=array_values(array_filter($v['rewardWishes']??[],fn($w)=>$w['childId']===$actor['id']||(($actor['memberType']??'')==='parent'&&($w['parentId']===$actor['id']||$actor['role']==='admin'))));
     $v['parentAssignments']=($actor['memberType']??'')==='parent'?array_values(array_filter($allAssignments,function($a)use($s){foreach($s['users'] as $u)if($u['id']===$a['userId'])return empty($u['archivedAt'])&&has_daily_program($u)&&!isset($a['routineId'])&&in_array($a['status'],['active','pending'],true);return false;})):[];
+    $v['taskPool']=($actor['memberType']??'')==='parent'?$s['tasks']:[];
     $v['parentDailyRoutines']=parent_daily_routines($s,$actor);
     $v['canViewProgress']=($actor['memberType']??'')==='parent'||$actor['role']==='admin';
     return $v;
