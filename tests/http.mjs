@@ -166,6 +166,16 @@ try{
  assert.equal((await request('saveTask',{...createdPool,points:99})).status,403);assert.equal((await request('deleteTask',{id:createdPool.id})).status,403);
  assert.equal((await request('saveTask',{scope:'shared',participantIds:['u3','u4'],title:'Shared parent task',points:14,icon:'✨',frequency:'daily'})).status,200);
  use(other);assert.ok((await request('state')).body.state.tasks.some(t=>t.id===createdPool.id));assert.deepEqual((await request('state')).body.state.taskPool,[]);assert.equal((await request('saveTask',{ownerId:'u3',title:'Forbidden',points:99,frequency:'daily'})).status,403);use(poolParent);
+ // Direct assignment is role-bound and serialized against duplicate requests.
+ const directInput={childId:'u3',taskId:createdPool.id,requestId:'direct-http-request-12345'};
+ use(other);assert.equal((await request('parentAssignTask',directInput)).status,403);
+ use(poolParent);assert.equal((await request('parentAssignTask',directInput,{'X-CSRF-Token':'bad'})).status,403);
+ const direct=await Promise.all([request('parentAssignTask',directInput),request('parentAssignTask',directInput)]);assert.deepEqual(direct.map(r=>r.status),[200,200]);assert.equal(direct[0].body.assignment.id,direct[1].body.assignment.id);
+ assert.equal((await request('parentAssignTask',{...directInput,requestId:'direct-http-other-12345'})).status,409);
+ use(other);const assignedView=(await request('state')).body.state;assert.ok(assignedView.assignments.some(a=>a.id===direct[0].body.assignment.id));assert.ok(!assignedView.users.find(u=>u.id==='u3').eligibleTaskIds.includes(createdPool.id));
+ use(poolParent);assert.equal((await request('parentApproveAssignment',{assignmentId:direct[0].body.assignment.id})).status,200);
+ const retained=(await request('state')).body.state.taskPool.find(t=>t.id===createdPool.id);assert.equal(retained.childStatuses.u3,'completed');
+ assert.equal((await request('parentAssignTask',{...directInput,requestId:'direct-http-finished-12345'})).status,409);
  // Child reward requests: nonadmin parent pricing, concurrent review and privacy.
  const wishParent={cookie,csrf};use(other);
  const wishInput={requestId:'wish-http-request-12345',title:'Aile sineması',icon:'🎬',parentId:'u2',cost:1,childId:'u4'};

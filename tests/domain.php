@@ -70,6 +70,7 @@ ok(deadline('monthly',new DateTimeImmutable('2027-01-31T15:42:13+03:00'))->forma
 ok(deadline('monthly',new DateTimeImmutable('2028-01-31T15:42:13+03:00'))->format('Y-m-d')==='2028-02-29','Month end respects leap year');
 $t=initial_state();goal($t);$a=spin($t,'u1','daily',uid(),$friday)['assignment'];complete_approved($t,'complete',['userId'=>'u1','assignmentId'=>$a['id']],$friday);
 ok(!in_array($a['taskId'],array_column(available_tasks($t,'u1','all',new DateTimeImmutable('2026-10-03T01:00:00+03:00')),'id')),'Midnight does not reset completed rolling-duration task');
+ok(!in_array($a['taskId'],array_column(available_tasks($t,'u1','all',$friday->modify('+2 years')),'id')),'Completed pool task never returns, including legacy timed tasks');
 // Competitions count only new on-time completions, even with identical second timestamps.
 mutate($t,'createCompetition',['title'=>'Family week','prize'=>'Picnic','target'=>1,'frequency'=>'weekly'],$friday);
 $c=$t['competitions'][0];ok(competition_snapshot($t,$c,$friday)['total']===0,'Competition excludes points earned before creation in same second');

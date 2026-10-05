@@ -59,8 +59,8 @@ function assignment_status(array $assignment,?DateTimeImmutable $now=null): stri
 function is_done(array $state, string $userId, array $task, ?DateTimeImmutable $now = null): bool {
     foreach($state['completions'] as $c){
         if($c['userId']!==$userId||$c['taskId']!==$task['id'])continue;
-        if(isset($c['dueAt'])){if(now_tr($now)<new DateTimeImmutable($c['dueAt']))return true;}
-        elseif($c['day']>=period_start($task['frequency'],$now)&&$c['day']<=now_tr($now)->format('Y-m-d'))return true;
+        // Pool tasks are one-time per child; daily routines have their own day-based logic.
+        return true;
     }
     return false;
 }
@@ -199,7 +199,7 @@ function mutate(array &$state,string $action,array $in,?DateTimeImmutable $now=n
     default:throw new AppError('Bilinmeyen işlem.',404);
     }
 }
-function spin(array &$state,string $userId,string $frequency,string $requestId,?DateTimeImmutable $now=null,bool $noDeadline=false): array {
+function spin(array &$state,string $userId,string $frequency,string $requestId,?DateTimeImmutable $now=null,bool $noDeadline=false,?string $taskId=null): array {
     $state=upgrade_state($state);$u=$state['users'][find_index($state['users'],$userId,'Kullanıcı')];
     if(!in_array($frequency,['all','daily','weekly','monthly'],true))throw new AppError('Görev dönemi geçersiz.');valid_request($requestId);
     foreach($state['assignments'] as $a)if($a['requestId']===$requestId){
@@ -211,12 +211,30 @@ function spin(array &$state,string $userId,string $frequency,string $requestId,?
     if(!$goal){$family=family_goal($state,$now);if($family)$goal=['id'=>$family['id'],'title'=>$family['prize']];}
     if(!$goal)$goal=['id'=>null,'title'=>'Görevlerimi tamamlamak'];
     $list=available_tasks($state,$userId,$frequency,$now);
-    if(!$list)throw new AppError('Bu dönemde seçilebilecek görev kalmadı. Aktif görevlerini tamamla veya başka bir dönem seç.',409);
+    if($taskId!==null)$list=array_values(array_filter($list,fn($t)=>$t['id']===$taskId));
+    if(!$list)throw new AppError('Seçilebilecek görev kalmadı. Bu görev tamamlanmış veya zaten atanmış olabilir.',409);
     $task=$list[random_int(0,count($list)-1)];
     $a=['id'=>uid(),'requestId'=>$requestId,'userId'=>$userId,'taskId'=>$task['id'],'title'=>$task['title'],'description'=>$task['description'],'icon'=>$task['icon'],'points'=>$task['points'],'frequency'=>$task['frequency'],'periodStart'=>period_start($task['frequency'],$now),'assignedAt'=>now_tr($now)->format(DateTimeInterface::ATOM),'dueAt'=>deadline($task['frequency'],$now)->format(DateTimeInterface::ATOM),'status'=>'active','goalRewardId'=>$goal['id'],'goalTitle'=>$goal['title']];
     if($noDeadline)$a['noDeadline']=true;
     $state['assignments'][]=$a;
     return ['task'=>$task,'assignment'=>$a,'candidates'=>$list];
+}
+
+function parent_assign_task(array &$s,array $actor,array $in,?DateTimeImmutable $now=null): array {
+    $parent=$s['users'][active_user_index($s,$actor['id'])];
+    if(($parent['memberType']??'')!=='parent')throw new AppError('Yalnızca ebeveyn görev atayabilir.',403);
+    $child=$s['users'][active_user_index($s,$in['childId']??null,'Çocuk')];
+    if(!has_daily_program($child))throw new AppError('Çocuk profili seç.',403);
+    $task=$s['tasks'][find_index($s['tasks'],$in['taskId']??null,'Görev')];
+    if(!task_visible_to($task,$child['id']))throw new AppError('Bu görev seçilen çocuğa ait değil.',403);
+    $request=valid_request($in['requestId']??null);
+    foreach($s['assignments'] as $a)if($a['requestId']===$request){
+        if($a['userId']!==$child['id']||$a['taskId']!==$task['id']||($a['assignedBy']??null)!==$parent['id'])throw new AppError('İşlem başka bir atamaya ait.',409);
+        return ['assignment'=>$a];
+    }
+    $result=spin($s,$child['id'],'all',$request,$now,true,$task['id']);
+    $i=count($s['assignments'])-1;$s['assignments'][$i]['assignedBy']=$parent['id'];
+    return ['assignment'=>$s['assignments'][$i]];
 }
 
 require_once __DIR__.'/routines.php';

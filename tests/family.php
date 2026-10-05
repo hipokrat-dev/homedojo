@@ -61,3 +61,25 @@ complete_routine($direct,$direct['users'][3],['routineId'=>'bed','day'=>'2026-10
 parent_approve_routine($direct,$mother,['childId'=>'u3','routineId'=>'sleep','day'=>'2026-10-03'],$time);$early=end($direct['completions']);check($early['submittedEarly']&&$early['at']===$time->format(DateTimeInterface::ATOM),'Parent early approval records actual time');parent_approve_routine($direct,$mother,['childId'=>'u3','routineId'=>'sleep','day'=>'2026-10-03'],$time);check(balance($direct,'u3')===20,'Repeated early approval awards once');
 denied(function()use(&$direct,$mother,$time){parent_approve_routine($direct,$mother,['childId'=>'u3','routineId'=>'bed','day'=>'2026-10-02'],$time);},409);
 echo "✓ Parent daily overview, observation, role boundaries and duplicate award protection passed.\n";
+
+// Direct parent assignment and permanent per-child pool completion.
+$s=initial_state();$s['users'][0]['memberType']='parent';$parent=$s['users'][0];$child=$s['users'][2];$parent['role']='admin';
+mutate($s,'saveTask',['scope'=>'shared','participantIds'=>['u3','u4'],'title'=>'Assign once','description'=>'','points'=>17,'icon'=>'✨','frequency'=>'daily']);$task=end($s['tasks']);
+$in=['childId'=>'u3','taskId'=>$task['id'],'requestId'=>'direct-parent-test-12345'];
+denied(function()use(&$s,$child,$in){parent_assign_task($s,$child,$in);},403);
+denied(function()use(&$s,$parent,$in){parent_assign_task($s,$parent,array_replace($in,['childId'=>'u1']));},403);
+$assigned=parent_assign_task($s,$parent,$in,$at)['assignment'];
+check($assigned['taskId']===$task['id']&&$assigned['assignedBy']==='u1'&&$assigned['noDeadline'],'Parent selects exact untimed task');
+check(parent_assign_task($s,$parent,$in,$at)['assignment']['id']===$assigned['id'],'Assignment retry is idempotent');
+denied(function()use(&$s,$parent,$in){parent_assign_task($s,$parent,array_replace($in,['requestId'=>'another-assignment-12345']));},409);
+parent_approve_assignment($s,$parent,['assignmentId'=>$assigned['id']],$at);
+check(!in_array($task['id'],array_column(available_tasks($s,'u3','all',$at->modify('+2 years')),'id')),'Completed assignment never returns to child wheel');
+check(in_array($task['id'],array_column(available_tasks($s,'u4','all',$at->modify('+2 years')),'id')),'Shared task remains available to other child');
+$view=member_snapshot($s,$parent);$row=array_values(array_filter($view['taskPool'],fn($t)=>$t['id']===$task['id']))[0];
+check($row['childStatuses']['u3']==='completed'&&$row['childStatuses']['u4']==='available','Parent retains completed template with individual child status');
+denied(function()use(&$s,$parent,$in,$at){parent_assign_task($s,$parent,array_replace($in,['requestId'=>'completed-again-12345']),$at->modify('+2 years'));},409);
+$private=array_values(array_filter($s['tasks'],fn($t)=>($t['ownerId']??null)==='u4'))[0];
+denied(function()use(&$s,$parent,$in,$private){parent_assign_task($s,$parent,array_replace($in,['taskId'=>$private['id']]));},403);
+$s['users'][2]['archivedAt']=$at->format(DateTimeInterface::ATOM);
+denied(function()use(&$s,$parent,$in){parent_assign_task($s,$parent,$in);},409);
+echo "Direct assignment and permanent completion checks passed.\n";

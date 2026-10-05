@@ -61,6 +61,15 @@ function member_snapshot(array $s,array $actor): array {
     $v['rewardWishes']=array_values(array_filter($v['rewardWishes']??[],fn($w)=>$w['childId']===$actor['id']||(($actor['memberType']??'')==='parent'&&($w['parentId']===$actor['id']||$actor['role']==='admin'))));
     $v['parentAssignments']=($actor['memberType']??'')==='parent'?array_values(array_filter($allAssignments,function($a)use($s){foreach($s['users'] as $u)if($u['id']===$a['userId'])return empty($u['archivedAt'])&&has_daily_program($u)&&!isset($a['routineId'])&&in_array($a['status'],['active','pending'],true);return false;})):[];
     $v['taskPool']=($actor['memberType']??'')==='parent'?$s['tasks']:[];
+    foreach($v['taskPool'] as &$task){
+        $task['childStatuses']=[];
+        foreach($v['users'] as $child){
+            if(!has_daily_program($child)||!task_visible_to($task,$child['id']))continue;
+            $status=is_done($s,$child['id'],$task)?'completed':'available';
+            if($status==='available')foreach($allAssignments as $a)if($a['userId']===$child['id']&&$a['taskId']===$task['id']&&in_array($a['status'],['active','pending'],true)){$status=$a['status'];break;}
+            $task['childStatuses'][$child['id']]=$status;
+        }
+    }unset($task);
     $v['parentDailyRoutines']=parent_daily_routines($s,$actor);
     $v['canViewProgress']=($actor['memberType']??'')==='parent'||$actor['role']==='admin';
     return $v;
