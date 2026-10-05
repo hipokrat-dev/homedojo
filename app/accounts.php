@@ -70,6 +70,9 @@ function member_snapshot(array $s,array $actor): array {
             $task['childStatuses'][$child['id']]=$status;
         }
     }unset($task);
+    $v['gameNames']=($actor['memberType']??'')==='young_child'?child_games($actor):[];
+    $v['gameChildren']=($actor['memberType']??'')==='parent'?array_values(array_map(fn($u)=>['id'=>$u['id'],'name'=>$u['name'],'avatar'=>$u['avatar'],'names'=>child_games($u)],array_filter($s['users'],fn($u)=>empty($u['archivedAt'])&&($u['memberType']??'')==='young_child'))):[];
+    foreach($v['users'] as &$u)unset($u['gameNames']);unset($u);
     $v['parentDailyRoutines']=parent_daily_routines($s,$actor);
     $v['canViewProgress']=($actor['memberType']??'')==='parent'||$actor['role']==='admin';
     return $v;
@@ -156,4 +159,19 @@ function save_photo(array &$s,array $actor,array $in): void {
     $i=self_user_index($s,$actor,$in);
     if(($in['remove']??false)===true){unset($s['users'][$i]['photo']);return;}
     $s['users'][$i]['photo']=normalized_photo($in['photo']??null);
+}
+
+function child_games(array $u): array {
+    return $u['gameNames']??['Saklambaç','Lego zamanı','Resim yap','Yapboz','Dans et','Hayvan taklidi'];
+}
+function save_games(array &$s,array $actor,array $in): void {
+    $parent=$s['users'][active_user_index($s,$actor['id'])];
+    if(($parent['memberType']??'')!=='parent')throw new AppError('Oyunları yalnızca ebeveyn düzenleyebilir.',403);
+    $i=active_user_index($s,$in['childId']??null,'Çocuk');
+    if(($s['users'][$i]['memberType']??'')!=='young_child')throw new AppError('Küçük çocuk profili seç.',400);
+    $names=$in['names']??null;
+    if(!is_array($names)||!array_is_list($names)||count($names)>12)throw new AppError('En fazla 12 oyun ekleyebilirsin.');
+    $clean=[];$seen=[];
+    foreach($names as $name){$name=valid_text($name,'Oyun adı',40);$key=mb_strtolower($name,'UTF-8');if(in_array($key,$seen,true))throw new AppError('Aynı oyunu bir kez yaz.');$seen[]=$key;$clean[]=$name;}
+    $s['users'][$i]['gameNames']=$clean;
 }

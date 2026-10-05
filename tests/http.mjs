@@ -110,6 +110,10 @@ try{
  assert.equal((await request('saveRoutines',{id:littleId,routines:[{id:'all-day',title:'Test routine',icon:'🌟',time:'00:00',until:'23:59',points:15}]})).status,200);
  cookie='';csrf=(await request('session')).body.csrf;const childLogin=await request('login',{username:'little_test',password:'little-fixture-password'});assert.equal(childLogin.status,200);csrf=childLogin.body.csrf;const little={cookie,csrf};
  const childState=(await request('state')).body.state;assert.equal(childState.dailyRoutines.length,1);assert.equal(childState.guardianName,'Baba');assert.ok(!JSON.stringify(childState).includes('passwordHash'));
+ assert.equal(childState.gameNames.length,6);assert.deepEqual(childState.gameChildren,[]);
+ assert.equal((await request('saveGames',{childId:littleId,names:['Forbidden']})).status,403);
+ use(admin);assert.equal((await request('saveGames',{childId:littleId,names:['Saklambaç','Lego']})).status,200);use(little);
+ assert.deepEqual((await request('state')).body.state.gameNames,['Saklambaç','Lego']);
  assert.equal((await request('spin',{frequency:'daily',requestId:'child-block-spin-12345'})).status,403);
  assert.equal((await request('createAccount',{})).status,403);
  assert.equal((await request('archiveAccount',{id:'u1'})).status,403);
@@ -130,6 +134,10 @@ try{
  const anne=(await request('state')).body.state.users.find(u=>u.id==='u2');assert.equal((await request('saveAccount',{id:'u2',name:anne.name,username:anne.username,avatar:anne.avatar,memberType:'parent'})).status,200);
  cookie='';csrf=(await request('session')).body.csrf;const parentLogin=await request('login',{username:'member2',password:'new-fixture-password'});assert.equal(parentLogin.status,200);csrf=parentLogin.body.csrf;assert.equal((await request('progress&mode=day&date='+olderPlan.today)).status,200,'Nonadmin parent can inspect progress');assert.equal((await request('saveRoutines',{id:'u3',routines:[]})).status,403,'Report access does not grant admin rights');
  const lateTestParent={cookie,csrf};
+ assert.equal((await request('saveGames',{childId:littleId,names:['Resim yap','Dans et']},{'X-CSRF-Token':'bad'})).status,403);
+ const gamesSaved=await request('saveGames',{childId:littleId,names:['Resim yap','Dans et']});assert.equal(gamesSaved.status,200);assert.deepEqual(gamesSaved.body.state.gameChildren.find(c=>c.id===littleId).names,['Resim yap','Dans et']);
+ assert.equal((await request('saveGames',{childId:littleId,names:['Duplicate','duplicate']})).status,400);
+
  // Daily schedule time is advisory: late submissions still need guardian approval.
  use(admin);assert.equal((await request('saveRoutines',{id:'u3',routines:[{id:'late-day',title:'Late daily task',icon:'📚',time:'00:00',until:'00:01',points:17}]})).status,200);
  use(other);const latePlan=(await request('state')).body.state;

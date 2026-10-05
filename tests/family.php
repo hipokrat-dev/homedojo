@@ -83,3 +83,17 @@ denied(function()use(&$s,$parent,$in,$private){parent_assign_task($s,$parent,arr
 $s['users'][2]['archivedAt']=$at->format(DateTimeInterface::ATOM);
 denied(function()use(&$s,$parent,$in){parent_assign_task($s,$parent,$in);},409);
 echo "Direct assignment and permanent completion checks passed.\n";
+
+// Each small child has a private game wheel editable by either parent.
+$s=initial_state();$s['users'][0]['memberType']='parent';$s['users'][0]['role']='admin';$s['users'][1]['memberType']='parent';$s['users'][1]['role']='member';$s['users'][3]['memberType']='young_child';$s['users'][2]['role']='member';$s['users'][3]['role']='member';$p=$s['users'][1];
+check(count(child_games($s['users'][3]))===6,'New small child gets six starter games');
+$input=['childId'=>'u4','names'=>['  Saklambaç  ','Resim yap']];save_games($s,$p,$input);
+check(child_games($s['users'][3])===['Saklambaç','Resim yap'],'Nonadmin parent can edit games and whitespace is normalized');
+check(member_snapshot($s,$s['users'][3])['gameNames']===['Saklambaç','Resim yap'],'Child sees saved games');
+check(member_snapshot($s,$s['users'][2])['gameChildren']===[]&&member_snapshot($s,$s['users'][2])['gameNames']===[],'Sibling cannot inspect game lists');
+denied(function()use(&$s,$input){save_games($s,$s['users'][3],$input);},403);
+foreach([[''],['Game','game'],array_fill(0,13,'Game'),[str_repeat('a',41)],[12],'bad'] as $names)denied(function()use(&$s,$p,$names){save_games($s,$p,['childId'=>'u4','names'=>$names]);},400);
+denied(function()use(&$s,$p){save_games($s,$p,['childId'=>'u3','names'=>['Game']]);},400);
+save_games($s,$p,['childId'=>'u4','names'=>[]]);check(child_games($s['users'][3])===[],'Clearing games remains empty instead of restoring defaults');
+check($s['completions']===[]&&$s['assignments']===[],'Game settings do not create tasks or points');
+echo "Game wheel permissions, validation and privacy passed.\n";

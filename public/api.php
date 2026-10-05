@@ -9,7 +9,7 @@ try{
     $config=configuration();session_start_safe();$action=$_GET['action']??'state';$method=$_SERVER['REQUEST_METHOD'];
     $development=($config['environment']??'production')==='development';
     if(!$development&&empty($config['password_hash']))throw new RuntimeException('Password is required in production.');
-    $writes=['parentAssignTask','parentApproveAssignment','parentApproveRoutine','requestReward','reviewRewardRequest','cancelRewardRequest','login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem','cancelAssignment','createCompetition','cancelCompetition','claimCompetition','setupAccounts','saveAccount','reviewAssignment','savePhoto','changeCredentials','createAccount','archiveAccount','restoreAccount','saveRoutines','completeRoutine'];
+    $writes=['saveGames','parentAssignTask','parentApproveAssignment','parentApproveRoutine','requestReward','reviewRewardRequest','cancelRewardRequest','login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem','cancelAssignment','createCompetition','cancelCompetition','claimCompetition','setupAccounts','saveAccount','reviewAssignment','savePhoto','changeCredentials','createAccount','archiveAccount','restoreAccount','saveRoutines','completeRoutine'];
     if(in_array($action,$writes,true)){
         if($method!=='POST')throw new AppError('Bu işlem POST gerektirir.',405);
         if(($_SERVER['HTTP_SEC_FETCH_SITE']??'')==='cross-site')throw new AppError('Bu kaynaktan işlem yapılamaz.',403);
@@ -72,6 +72,7 @@ try{
         elseif($action==='archiveAccount')archive_account($s,$actor,$input);
         elseif($action==='restoreAccount')restore_account($s,$input);
         elseif($action==='saveRoutines')save_routines($s,$input);
+        elseif($action==='saveGames')save_games($s,$actor,$input);
         elseif($action==='parentAssignTask')$result=parent_assign_task($s,$actor,$input);
         elseif($action==='parentApproveAssignment')parent_approve_assignment($s,$actor,$input);
         elseif($action==='parentApproveRoutine')parent_approve_routine($s,$actor,$input);
