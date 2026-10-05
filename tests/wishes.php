@@ -18,3 +18,15 @@ $in['requestId']=uid();reward_wish($s,$child,'requestReward',$in);$id=end($s['re
 $in['requestId']=uid();reward_wish($s,$child,'requestReward',$in);$id=end($s['rewardWishes'])['id'];$count=count($s['rewards']);reward_wish($s,$parent,'reviewRewardRequest',['id'=>$id,'decision'=>'decline','note'=>'Birlikte başka bir ödül seçelim.']);check(count($s['rewards'])===$count&&end($s['rewardWishes'])['status']==='declined','Decline records response without creating reward');
 for($i=0;$i<5;$i++){$in['requestId']=uid();reward_wish($s,$child,'requestReward',$in);}$in['requestId']=uid();denied(fn()=>reward_wish($s,$child,'requestReward',$in),409);
 echo "✓ $n reward request permission, privacy, pricing, retry, cancellation and goal checks passed.\n";
+
+// Parent cleanup never changes a child's goal, reward, score or request history.
+$before=$s;reward_wish($s,$parent,'deleteRewardRequest',['id'=>$w['id']]);reward_wish($s,$parent,'deleteRewardRequest',['id'=>$w['id']]);
+check(!in_array($w['id'],array_column(member_snapshot($s,$parent)['rewardWishes'],'id')),'Deleted request hidden from parent');
+check(in_array($w['id'],array_column(member_snapshot($s,$child)['rewardWishes'],'id')),'Child retains request');
+check(in_array($w['id'],array_column(member_snapshot($s,$admin)['rewardWishes'],'id')),'Other parent retains own view');
+foreach(['users','rewards','completions','redemptions'] as $key)check($s[$key]===$before[$key],'Cleanup preserves '.$key);
+check(!str_contains(json_encode(member_snapshot($s,$child)['rewardWishes']),'hiddenByParents'),'Deletion metadata stays private');
+denied(fn()=>reward_wish($s,$child,'deleteRewardRequest',['id'=>$w['id']]),403);
+$pending=end($s['rewardWishes']);denied(fn()=>reward_wish($s,$parent,'deleteRewardRequest',['id'=>$pending['id']]),409);
+$outsider=$parent;$outsider['id']='different-parent';denied(fn()=>reward_wish($s,$outsider,'deleteRewardRequest',['id'=>$w['id']]),403);
+echo "Parent request cleanup checks passed.\n";

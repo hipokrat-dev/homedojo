@@ -194,6 +194,11 @@ try{
  use(wishParent);assert.equal((await request('state')).body.state.rewardWishes[0].id,wish.id);
  const reviews=await Promise.all([request('reviewRewardRequest',{id:wish.id,decision:'approve',cost:250}),request('reviewRewardRequest',{id:wish.id,decision:'approve',cost:250})]);assert.deepEqual(reviews.map(r=>r.status).sort(),[200,409]);
  use(other);const wishState=(await request('state')).body.state;assert.equal(wishState.rewardWishes[0].status,'approved');assert.equal(wishState.users.find(u=>u.id==='u3').goal.cost,250);assert.equal(wishState.rewards.filter(r=>r.wishId===wish.id).length,1);
+ assert.equal((await request('deleteRewardRequest',{id:wish.id})).status,403);
+ use(wishParent);assert.equal((await request('deleteRewardRequest',{id:wish.id},{'X-CSRF-Token':'bad'})).status,403);
+ const removed=await request('deleteRewardRequest',{id:wish.id});assert.equal(removed.status,200);assert.ok(!removed.body.state.rewardWishes.some(w=>w.id===wish.id));
+ assert.ok(!(await request('state')).body.state.rewardWishes.some(w=>w.id===wish.id));
+ use(other);const preserved=(await request('state')).body.state;assert.ok(preserved.rewardWishes.some(w=>w.id===wish.id));assert.equal(preserved.users.find(u=>u.id==='u3').goal.cost,250);
  use(admin);assert.equal((await request('setupAccounts',{adminId:'u1',accounts})).status,409);
  assert.equal((await request('logout',{})).status,200);assert.equal((await request('state')).status,401);
  console.log('✓ HTTP personal login, migration, roles, ownership, privacy, CSRF, session rotation/revocation, concurrent draws/submissions/approvals, frozen points, reward debit and family scoring passed.');

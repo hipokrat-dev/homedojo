@@ -59,6 +59,8 @@ function member_snapshot(array $s,array $actor): array {
     foreach($v['users'] as &$u)if($actor['role']!=='admin'&&$u['id']!==$actor['id'])unset($u['routineSchedule'],$u['guardianId']);unset($u);
     if(has_daily_program($actor)){$v['dailyRoutines']=daily_routines($s,$actor);$v['guardianName']=routine_guardian($s,$actor)['name'];}
     $v['rewardWishes']=array_values(array_filter($v['rewardWishes']??[],fn($w)=>$w['childId']===$actor['id']||(($actor['memberType']??'')==='parent'&&($w['parentId']===$actor['id']||$actor['role']==='admin'))));
+    if(($actor['memberType']??'')==='parent')$v['rewardWishes']=array_values(array_filter($v['rewardWishes'],fn($w)=>!isset($w['hiddenByParents'][$actor['id']])));
+    foreach($v['rewardWishes'] as &$wish)unset($wish['hiddenByParents']);unset($wish);
     $v['parentAssignments']=($actor['memberType']??'')==='parent'?array_values(array_filter($allAssignments,function($a)use($s){foreach($s['users'] as $u)if($u['id']===$a['userId'])return empty($u['archivedAt'])&&has_daily_program($u)&&!isset($a['routineId'])&&in_array($a['status'],['active','pending'],true);return false;})):[];
     $v['taskPool']=($actor['memberType']??'')==='parent'?$s['tasks']:[];
     foreach($v['taskPool'] as &$task){

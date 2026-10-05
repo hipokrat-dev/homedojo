@@ -19,6 +19,12 @@ function reward_wish(array &$s,array $actor,string $action,array $in): void {
         $s['rewardWishes'][$i]['status']='cancelled';$s['rewardWishes'][$i]['resolvedAt']=now_tr()->format(DateTimeInterface::ATOM);return;
     }
     if(($actor['memberType']??'')!=='parent'||($actor['id']!==$w['parentId']&&($actor['role']??'')!=='admin'))throw new AppError('Bu isteği seçilen ebeveyn değerlendirebilir.',403);
+    if($action==='deleteRewardRequest'){
+        if($w['status']==='pending')throw new AppError('Önce bekleyen isteği değerlendir.',409);
+        // Hide only in this parent's views; preserve the child's goal and financial history.
+        $s['rewardWishes'][$i]['hiddenByParents'][$actor['id']] ??= now_tr()->format(DateTimeInterface::ATOM);
+        return;
+    }
     $decision=$in['decision']??'';if(!in_array($decision,['approve','decline'],true))throw new AppError('Geçerli bir karar seç.');
     if($w['status']!=='pending')throw new AppError('Bu istek zaten değerlendirildi.',409);
     $child=active_user_index($s,$w['childId'],'Çocuk');
