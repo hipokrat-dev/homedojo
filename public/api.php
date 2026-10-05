@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');
+header('X-HomeDojo-Version: 9');header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');
 require_once __DIR__.'/../app/bootstrap.php';
 require_once __DIR__.'/../app/accounts.php';
 require_once __DIR__.'/../app/progress.php';

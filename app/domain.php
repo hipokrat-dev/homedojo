@@ -34,7 +34,12 @@ function upgrade_state(array $state): array {
         $u['memberType'] ??= (($u['role']??'')==='admin'||mb_strtolower($u['name'],'UTF-8')==='anne')?'parent':'child';
         if(has_daily_program($u)){$u['routineSchedule'] ??= default_routines();if(!isset($u['routineHistory']))record_routine_program($u);}
     }unset($u);
-    $state['version'] = 8;
+    // One-time upgrade for the existing Anne profile. Keep credentials and sessions intact.
+    if(($state['version']??0)<9&&!empty($state['accountsEnabled'])){
+        foreach($state['users'] as &$u)if($u['id']==='u2'&&($u['memberType']??'')==='parent'&&empty($u['archivedAt']))$u['role']='admin';
+        unset($u);
+    }
+    $state['version'] = 9;
     return $state;
 }
 function initial_state(): array { return upgrade_state(json_decode(file_get_contents(__DIR__.'/seed.json'), true, 512, JSON_THROW_ON_ERROR)); }

@@ -33,3 +33,17 @@ echo "✓ $count account, privacy, role and approval checks passed.\n";
 check(account_password('1234')==='1234','Four-digit player password accepted');
 check(account_password('şğüı')==='şğüı','Four Turkish characters accepted');
 try{account_password('123');throw new RuntimeException('Three-character password accepted');}catch(AppError $e){check($e->status===400,'Too short password rejected');}
+
+// Existing Anne receives the same admin role as Baba during the v9 migration.
+$legacy=initial_state();setup_accounts($legacy,['adminId'=>'u1','accounts'=>array_map(fn($u)=>['id'=>$u['id'],'name'=>$u['id']==='u2'?'Anne':$u['name'],'username'=>'migration'.$u['id'],'password'=>'1234'],$legacy['users'])]);$legacy['version']=8;
+$before=$legacy;$up=upgrade_state($legacy);$mother=$up['users'][1];
+check($mother['role']==='admin'&&$up['users'][0]['role']==='admin','Both existing parents are admins');
+check($mother['passwordHash']===$before['users'][1]['passwordHash']&&$mother['authVersion']===$before['users'][1]['authVersion'],'Credentials and sessions remain valid');
+foreach(['saveTask','deleteTask','saveReward','deleteReward','saveUser','saveAccount','createAccount','archiveAccount','restoreAccount','saveRoutines','createCompetition','cancelCompetition','claimCompetition'] as $action){$input=[];authorize_action($up,$mother,$action,$input);check(true,'Mother authorized: '.$action);}
+$view=member_snapshot($up,$mother);check($view['viewerRole']==='admin'&&count($view['tasks'])===count($up['tasks'])&&count($view['rewards'])===count($up['rewards']),'Mother receives complete admin catalog and UI role');
+check($up['users'][2]['role']==='member'&&$up['users'][3]['role']==='member','Children stay members');
+check(upgrade_state($up)===$up,'Migration is idempotent');
+$childState=$legacy;$childState['users'][1]['memberType']='child';check(upgrade_state($childState)['users'][1]['role']==='member','Child profile cannot gain admin');
+require_once __DIR__.'/../app/store.php';$store=new Store(['environment'=>'development','driver'=>'sqlite','sqlite_path'=>':memory:']);$store->initialize();$store->db->prepare('UPDATE homedojo_state SET payload=? WHERE id=1')->execute([json_encode($legacy)]);$store->read();$saved=json_decode($store->db->query('SELECT payload FROM homedojo_state WHERE id=1')->fetchColumn(),true);check($saved['version']===9&&$saved['users'][1]['role']==='admin','First read durably promotes existing mother');
+$session=['userId'=>'u2','authVersion'=>$mother['authVersion'],'expires'=>time()+600];check(actor_for($saved,$session)['role']==='admin','Existing mother session immediately has admin access');
+echo "Mother admin migration and permissions passed.\n";
