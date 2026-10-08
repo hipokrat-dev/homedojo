@@ -4,7 +4,11 @@ RewriteEngine On
 RewriteRule ^(?:app|data|tests|docs|server|node_modules|\.git)(?:/|$) - [F,L,NC]
 RewriteRule ^(?:\.|package|README|composer|deploy) - [F,L,NC]
 RewriteRule ^$ public/index.php [L]
-RewriteRule ^(app\.js|style\.css|favicon\.svg|api\.php|setup\.php|recover\.php)$ public/$1 [L]
+RewriteRule ^(app\.js|style\.css|favicon\.svg|manifest\.webmanifest|sw\.js|pwa\.js|offline\.html|api\.php|setup\.php|recover\.php)$ public/$1 [L]
+RewriteRule ^icons/(icon-192|icon-512|maskable-512|apple-touch-icon)\.png$ public/icons/$1.png [L]
+<IfModule mod_mime.c>
+AddType application/manifest+json .webmanifest
+</IfModule>
 <IfModule mod_headers.c>
 <FilesMatch "\.(html|css|js)$">
 Header set Cache-Control "no-cache"
