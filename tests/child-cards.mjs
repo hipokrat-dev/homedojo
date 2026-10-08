@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const source=fs.readFileSync('public/app.js','utf8');
+const functionSource=source.slice(source.indexOf('function newlyApprovedTasks('),source.indexOf('function acceptState('));
+const context=vm.createContext({});vm.runInContext(functionSource,context);
+const snapshot=(memberType='young_child',assignments=[],viewerId='u4')=>({viewerId,users:[{id:viewerId,memberType}],assignments});
+const task={id:'approved-1',userId:'u4',status:'completed',points:10};
+const detect=(a,b)=>context.newlyApprovedTasks(a,b).map(t=>t.id).join(',');
+assert.equal(detect(null,snapshot('young_child',[task])), '');
+assert.equal(detect(snapshot(),snapshot('young_child',[task])), 'approved-1');
+assert.equal(detect(snapshot('child',[{...task,status:'pending'}]),snapshot('child',[task])), 'approved-1');
+assert.equal(detect(snapshot('young_child',[task]),snapshot('young_child',[task])), '');
+assert.equal(detect(snapshot(),snapshot('parent',[task])), '');
+assert.equal(detect(snapshot(),snapshot('young_child',[{...task,userId:'u3'}])), '');
+assert.equal(detect(snapshot(),snapshot('young_child',[{...task,status:'pending'}])), '');
+assert.equal(detect(snapshot(),snapshot('child',[task],'u3')), '');
+console.log('Child approval celebrations: direct approval, requested approval, repeat polling, initial load and account isolation passed.');

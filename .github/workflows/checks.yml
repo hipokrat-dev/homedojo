@@ -18,4 +18,5 @@ jobs:
       - run: php tests/domain.php && php tests/store.php && php tests/accounts.php && php tests/personal-catalogs.php && php tests/profile.php && php tests/family.php && php tests/progress.php && php tests/site.php && php tests/wishes.php
       - run: node --check public/app.js
       - run: node tests/pwa.mjs
+      - run: node tests/child-cards.mjs
       - run: node tests/http.mjs
