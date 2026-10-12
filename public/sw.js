@@ -17,3 +17,21 @@ self.addEventListener('fetch',event=>{
  }
  if(PUBLIC_FILES.includes(url.pathname)&&!url.search)event.respondWith(caches.match(request).then(hit=>hit||fetch(request)));
 });
+
+self.addEventListener('push',event=>{
+ event.waitUntil(self.registration.showNotification('Yeni görevin var! 🎯',{
+  body:'HomeDojo’da seni bekleyen görevleri görmek için dokun.',
+  icon:'/icons/icon-192.png',badge:'/icons/icon-192.png',tag:'homedojo-new-task',renotify:true,
+  data:{url:'/#profile'},vibrate:[180,80,180]
+ }));
+});
+self.addEventListener('notificationclick',event=>{
+ event.notification.close();
+ event.waitUntil((async()=>{
+  const url=new URL('/#profile',self.location.origin).href;
+  const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+  const client=windows.find(c=>new URL(c.url).origin===self.location.origin);
+  if(client){await client.navigate(url);return client.focus();}
+  return self.clients.openWindow(url);
+ })());
+});
