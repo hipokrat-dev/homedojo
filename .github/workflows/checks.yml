@@ -16,9 +16,10 @@ jobs:
           node-version: '22'
       - run: find app public tests -name '*.php' -exec php -l {} \;
       - run: php tests/domain.php && php tests/store.php && php tests/accounts.php
-      - run: php tests/planner.php && php tests/personal-catalogs.php && php tests/profile.php && php tests/family.php && php tests/progress.php && php tests/site.php && php tests/wishes.php
+      - run: php tests/football.php && php tests/planner.php && php tests/personal-catalogs.php && php tests/profile.php && php tests/family.php && php tests/progress.php && php tests/site.php && php tests/wishes.php
       - run: node --check public/app.js
       - run: php tests/push.php
       - run: node tests/pwa.mjs
       - run: node tests/child-cards.mjs
+      - run: node tests/football.mjs
       - run: node tests/http.mjs

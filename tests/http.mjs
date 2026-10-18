@@ -199,6 +199,13 @@ try{
  const removed=await request('deleteRewardRequest',{id:wish.id});assert.equal(removed.status,200);assert.ok(!removed.body.state.rewardWishes.some(w=>w.id===wish.id));
  assert.ok(!(await request('state')).body.state.rewardWishes.some(w=>w.id===wish.id));
  use(other);const preserved=(await request('state')).body.state;assert.ok(preserved.rewardWishes.some(w=>w.id===wish.id));assert.equal(preserved.users.find(u=>u.id==='u3').goal.cost,250);
+ use(other);
+ const savedVideo=await request('saveFootballVideo',{team:'bayern',url:'https://youtu.be/M7lc1UVf-VE',title:'Örnek video'});assert.equal(savedVideo.status,200);const videoId=savedVideo.body.state.footballVideos[0].id;
+ assert.equal((await request('saveFootballVideo',{team:'bayern',url:'https://evil.example/video' })).status,400);
+ assert.equal((await request('deleteFootballVideo',{id:videoId},{'X-CSRF-Token':'bad'})).status,403);
+ assert.equal((await request('state')).body.state.footballVideos[0].id,videoId);
+ use(wishParent);assert.equal((await request('state')).body.state.footballVideos.length,0);assert.equal((await request('deleteFootballVideo',{id:videoId})).status,403);assert.equal((await request('football&team=bursa')).status,403);
+ use(other);assert.equal((await request('deleteFootballVideo',{id:videoId})).status,200);
  use(admin);assert.equal((await request('setupAccounts',{adminId:'u1',accounts})).status,409);
  assert.equal((await request('logout',{})).status,200);assert.equal((await request('state')).status,401);
  console.log('✓ HTTP personal login, migration, roles, ownership, privacy, CSRF, session rotation/revocation, concurrent draws/submissions/approvals, frozen points, reward debit and family scoring passed.');
