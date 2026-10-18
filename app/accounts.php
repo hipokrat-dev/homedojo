@@ -49,8 +49,8 @@ function authorize_action(array $s,array $actor,string $action,array &$in): void
     }
 }
 function member_snapshot(array $s,array $actor): array {
-    $v=snapshot($s);$allAssignments=$v['assignments'];$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];
-    foreach($v['users'] as &$u){unset($u['passwordHash'],$u['authVersion'],$u['routineHistory'],$u['routineTrackingSince'],$u['routineTrackingAt']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
+    $v=snapshot($s);$allAssignments=$v['assignments'];$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];$v['personalPlan']=$actor['personalPlan']??[];
+    foreach($v['users'] as &$u){unset($u['personalPlan'],$u['passwordHash'],$u['authVersion'],$u['routineHistory'],$u['routineTrackingSince'],$u['routineTrackingAt']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
     $v['assignments']=array_values(array_filter($v['assignments'],fn($a)=>$a['userId']===$actor['id']||($a['reviewerId']??null)===$actor['id']));
     foreach(['completions','redemptions'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($a)=>$a['userId']===$actor['id']));
     if($actor['role']!=='admin')foreach(['tasks','rewards'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($r)=>$key==='tasks'?task_visible_to($r,$actor['id']):$r['ownerId']===$actor['id']));
@@ -176,4 +176,25 @@ function save_games(array &$s,array $actor,array $in): void {
     $clean=[];$seen=[];
     foreach($names as $name){$name=valid_text($name,'Oyun adı',40);$key=mb_strtolower($name,'UTF-8');if(in_array($key,$seen,true))throw new AppError('Aynı oyunu bir kez yaz.');$seen[]=$key;$clean[]=$name;}
     $s['users'][$i]['gameNames']=$clean;
+}
+
+function personal_plan(array &$s,array $actor,string $action,array $in): void {
+    if(($actor['memberType']??'')!=='child')throw new AppError('Bu alan büyük çocuk hesabına ait.',403);
+    $i=active_user_index($s,$actor['id']);$items=$s['users'][$i]['personalPlan']??[];
+    $id=$in['id']??null;$index=null;
+    if($id!==null){foreach($items as $j=>$item)if($item['id']===$id)$index=$j;if($index===null)throw new AppError('Plan bulunamadı.',404);}
+    if($action==='deletePlan'){if($index===null)throw new AppError('Plan seç.');array_splice($items,$index,1);}
+    elseif($action==='togglePlan'){if($index===null||$items[$index]['kind']!=='todo')throw new AppError('Yapılacak iş seç.');$items[$index]['done']=!$items[$index]['done'];}
+    else {
+        $title=$in['title']??null;$kind=$in['kind']??null;$day=$in['day']??null;$time=$in['time']??'';
+        if(!is_string($title)||trim($title)===''||mb_strlen($title)>100)throw new AppError('1–100 karakterlik başlık yaz.');
+        if(!in_array($kind,['lesson','todo'],true))throw new AppError('Plan türünü seç.');
+        if($kind==='lesson'){if(!is_string($day)||!preg_match('/^[1-7]$/D',$day))throw new AppError('Haftanın gününü seç.');}
+        else {if(!is_string($day)||!preg_match('/^\d{4}-\d{2}-\d{2}$/D',$day)||!($d=DateTimeImmutable::createFromFormat('!Y-m-d',$day))||$d->format('Y-m-d')!==$day)throw new AppError('Geçerli tarih seç.');}
+        if(!is_string($time)||($time!==''&&!preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/D',$time)))throw new AppError('Geçerli saat seç.');
+        if($index===null&&count($items)>=200)throw new AppError('En fazla 200 plan kaydedebilirsin. Eski işleri sil.');
+        $item=['id'=>$id??uid(),'title'=>trim($title),'kind'=>$kind,'day'=>$day,'time'=>$time,'done'=>$index!==null&&$kind==='todo'?($items[$index]['done']??false):false];
+        if($index===null)$items[]=$item;else $items[$index]=$item;
+    }
+    $s['users'][$i]['personalPlan']=array_values($items);
 }
