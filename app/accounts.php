@@ -50,8 +50,8 @@ function authorize_action(array $s,array $actor,string $action,array &$in): void
     }
 }
 function member_snapshot(array $s,array $actor): array {
-    $v=snapshot($s);$allAssignments=$v['assignments'];$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];$v['personalPlan']=$actor['personalPlan']??[];$v['footballEnabled']=football_enabled($actor);$v['footballVideos']=$v['footballEnabled']?($actor['footballVideos']??[]):[];
-    foreach($v['users'] as &$u){unset($u['footballVideos'],$u['personalPlan'],$u['passwordHash'],$u['authVersion'],$u['routineHistory'],$u['routineTrackingSince'],$u['routineTrackingAt']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
+    $v=snapshot($s);$allAssignments=$v['assignments'];$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];$v['personalNotes']=$actor['personalNotes']??[];$v['personalPlan']=$actor['personalPlan']??[];$v['footballEnabled']=football_enabled($actor);$v['footballVideos']=$v['footballEnabled']?($actor['footballVideos']??[]):[];
+    foreach($v['users'] as &$u){unset($u['personalNotes'],$u['footballVideos'],$u['personalPlan'],$u['passwordHash'],$u['authVersion'],$u['routineHistory'],$u['routineTrackingSince'],$u['routineTrackingAt']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
     $v['assignments']=array_values(array_filter($v['assignments'],fn($a)=>$a['userId']===$actor['id']||($a['reviewerId']??null)===$actor['id']));
     foreach(['completions','redemptions'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($a)=>$a['userId']===$actor['id']));
     if($actor['role']!=='admin')foreach(['tasks','rewards'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($r)=>$key==='tasks'?task_visible_to($r,$actor['id']):$r['ownerId']===$actor['id']));
@@ -198,4 +198,23 @@ function personal_plan(array &$s,array $actor,string $action,array $in): void {
         if($index===null)$items[]=$item;else $items[$index]=$item;
     }
     $s['users'][$i]['personalPlan']=array_values($items);
+}
+
+function personal_note(array &$s,array $actor,string $action,array $in): void {
+    if(!in_array($actor['memberType']??'', ['child','parent'],true))throw new AppError('Notlar büyük çocuk ve ebeveyn hesaplarına açık.',403);
+    $i=active_user_index($s,$actor['id']);$items=$s['users'][$i]['personalNotes']??[];
+    $id=$in['id']??null;$index=null;
+    if($id!==null){foreach($items as $j=>$item)if($item['id']===$id)$index=$j;if($index===null)throw new AppError('Not bulunamadı.',404);}
+    if($action==='deleteNote'){
+        if($index===null)throw new AppError('Silinecek notu seç.');array_splice($items,$index,1);
+    }elseif($action==='saveNote'){
+        $title=$in['title']??null;$body=$in['body']??null;$category=$in['category']??null;
+        if(!is_string($title)||trim($title)===''||mb_strlen($title)>100)throw new AppError('1–100 karakterlik başlık yaz.');
+        if(!is_string($body)||trim($body)===''||mb_strlen($body)>3000)throw new AppError('1–3000 karakterlik not yaz.');
+        if(!in_array($category,['general','homework','sport','music'],true))throw new AppError('Not kategorisini seç.');
+        if($index===null&&count($items)>=100)throw new AppError('En fazla 100 not saklayabilirsin.');
+        $now=gmdate('c');$item=['id'=>$id??uid(),'title'=>trim($title),'body'=>trim($body),'category'=>$category,'createdAt'=>$index!==null?$items[$index]['createdAt']:$now,'updatedAt'=>$now];
+        if($index===null)$items[]=$item;else $items[$index]=$item;
+    }else throw new AppError('Geçersiz not işlemi.');
+    $s['users'][$i]['personalNotes']=array_values($items);
 }
