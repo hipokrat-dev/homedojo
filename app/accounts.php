@@ -50,7 +50,7 @@ function authorize_action(array $s,array $actor,string $action,array &$in): void
     }
 }
 function member_snapshot(array $s,array $actor): array {
-    $v=snapshot($s);$allAssignments=$v['assignments'];$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];$v['personalNotes']=$actor['personalNotes']??[];$v['personalPlan']=$actor['personalPlan']??[];$v['footballEnabled']=football_enabled($actor);$v['footballVideos']=$v['footballEnabled']?($actor['footballVideos']??[]):[];
+    $v=snapshot($s);$v['shoppingItems']=($actor['memberType']??'')==='parent'?($s['shoppingItems']??[]):[];$allAssignments=$v['assignments'];$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];$v['personalNotes']=$actor['personalNotes']??[];$v['personalPlan']=$actor['personalPlan']??[];$v['footballEnabled']=football_enabled($actor);$v['footballVideos']=$v['footballEnabled']?($actor['footballVideos']??[]):[];
     foreach($v['users'] as &$u){unset($u['personalNotes'],$u['footballVideos'],$u['personalPlan'],$u['passwordHash'],$u['authVersion'],$u['routineHistory'],$u['routineTrackingSince'],$u['routineTrackingAt']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
     $v['assignments']=array_values(array_filter($v['assignments'],fn($a)=>$a['userId']===$actor['id']||($a['reviewerId']??null)===$actor['id']));
     foreach(['completions','redemptions'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($a)=>$a['userId']===$actor['id']));
@@ -180,7 +180,8 @@ function save_games(array &$s,array $actor,array $in): void {
 }
 
 function personal_plan(array &$s,array $actor,string $action,array $in): void {
-    if(($actor['memberType']??'')!=='child')throw new AppError('Bu alan büyük çocuk hesabına ait.',403);
+    if(!in_array($actor['memberType']??'',['child','parent'],true))throw new AppError('Bu hesap kişisel plan kullanamaz.',403);
+    if(($actor['memberType']??'')==='parent'&&$action==='savePlan'&&($in['kind']??null)!=='todo')throw new AppError('Yapılacak iş seç.');
     $i=active_user_index($s,$actor['id']);$items=$s['users'][$i]['personalPlan']??[];
     $id=$in['id']??null;$index=null;
     if($id!==null){foreach($items as $j=>$item)if($item['id']===$id)$index=$j;if($index===null)throw new AppError('Plan bulunamadı.',404);}
@@ -217,4 +218,31 @@ function personal_note(array &$s,array $actor,string $action,array $in): void {
         if($index===null)$items[]=$item;else $items[$index]=$item;
     }else throw new AppError('Geçersiz not işlemi.');
     $s['users'][$i]['personalNotes']=array_values($items);
+}
+
+function shopping_item(array &$s,array $actor,string $action,array $in): void {
+    if(($actor['memberType']??'')!=='parent')throw new AppError('Alışveriş listesi yalnızca ebeveynlere açık.',403);
+    $items=$s['shoppingItems']??[];$id=$in['id']??null;$index=null;
+    if($id!==null){$index=find_index($items,$id,'Ürün');}
+    if($action==='saveShoppingItem'){
+        $title=valid_text($in['title']??null,'Ürün adı',100);$quantity=valid_text($in['quantity']??'','Miktar',40,false);$note=valid_text($in['note']??'','Not',300,false);
+        if($index===null){
+            if(count($items)>=300)throw new AppError('Liste doldu. Eski ürünleri kaldırarak yer açabilirsin.');
+            $items[]=['id'=>uid(),'title'=>$title,'quantity'=>$quantity,'note'=>$note,'done'=>false,'createdBy'=>$actor['id'],'createdAt'=>gmdate('c'),'updatedAt'=>gmdate('c'),'revision'=>1];
+        }else{
+            if(($in['revision']??null)!==$items[$index]['revision'])throw new AppError('Bu ürün başka bir cihazda değişti. Listeyi yenileyip tekrar aç.',409);
+            $items[$index]=array_merge($items[$index],['title'=>$title,'quantity'=>$quantity,'note'=>$note,'updatedAt'=>gmdate('c'),'revision'=>$items[$index]['revision']+1]);
+        }
+    }elseif($action==='setShoppingDone'){
+        if($index===null||!is_bool($in['done']??null))throw new AppError('Ürün ve durum seç.');
+        if($items[$index]['done']!==$in['done']){
+            if(($in['revision']??null)!==$items[$index]['revision'])throw new AppError('Ürün güncellendi. Son durumunu kontrol edip tekrar dene.',409);
+            $items[$index]=array_merge($items[$index],['done'=>$in['done'],'doneBy'=>$in['done']?$actor['id']:null,'doneAt'=>$in['done']?gmdate('c'):null,'updatedAt'=>gmdate('c'),'revision'=>$items[$index]['revision']+1]);
+        }
+    }elseif($action==='deleteShoppingItem'){
+        if($index===null)throw new AppError('Ürün seç.');
+        if(($in['revision']??null)!==$items[$index]['revision'])throw new AppError('Bu ürün değişti. Listeyi yenileyip tekrar aç.',409);
+        array_splice($items,$index,1);
+    }else throw new AppError('Geçersiz alışveriş işlemi.');
+    $s['shoppingItems']=array_values($items);
 }

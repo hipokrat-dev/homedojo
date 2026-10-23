@@ -222,6 +222,27 @@ try{
  assert.equal((await request('saveNote',{...noteInput,body:'a'.repeat(3001)})).status,400);
  const noteEdit=await request('saveNote',{...noteInput,id:noteId,title:'Yeni başlık',category:'sport'});assert.equal(noteEdit.status,200);assert.equal(noteEdit.body.state.personalNotes.length,1);assert.equal(noteEdit.body.state.personalNotes[0].category,'sport');
  assert.equal((await request('deleteNote',{id:noteId})).status,200);assert.deepEqual((await request('state')).body.state.personalNotes,[]);
+ {
+ use(wishParent);
+ const parentPlan=await request('savePlan',{kind:'todo',title:'Kargoyu al',day:'2026-10-23',time:'15:30'});assert.equal(parentPlan.status,200);const parentPlanId=parentPlan.body.state.personalPlan.at(-1).id;
+ use(admin);assert.ok(!(await request('state')).body.state.personalPlan.some(p=>p.id===parentPlanId));assert.equal((await request('deletePlan',{id:parentPlanId})).status,404);
+ use(wishParent);assert.equal((await request('togglePlan',{id:parentPlanId})).status,200);assert.equal((await request('savePlan',{kind:'lesson',title:'Ders',day:'1'})).status,400);
+ const grocery={title:'Süt',quantity:'2 litre',note:'Laktozsuz'};
+ assert.equal((await request('saveShoppingItem',grocery,{'X-CSRF-Token':'bad'})).status,403);
+ const added=await request('saveShoppingItem',grocery);assert.equal(added.status,200);let product=added.body.state.shoppingItems.at(-1);
+ use(other);assert.deepEqual((await request('state')).body.state.shoppingItems,[]);assert.equal((await request('saveShoppingItem',grocery)).status,403);assert.equal((await request('setShoppingDone',{id:product.id,revision:1,done:true})).status,403);assert.equal((await request('deleteShoppingItem',{id:product.id,revision:1})).status,403);
+ use(admin);const shared=(await request('state')).body.state.shoppingItems;assert.ok(shared.some(x=>x.id===product.id&&x.note==='Laktozsuz'));
+ const bought=await request('setShoppingDone',{id:product.id,revision:1,done:true});assert.equal(bought.status,200);product=bought.body.state.shoppingItems.find(x=>x.id===product.id);assert.equal(product.doneBy,'u1');
+ assert.equal((await request('setShoppingDone',{id:product.id,revision:1,done:true})).status,200,'repeat check is idempotent');
+ use(wishParent);assert.ok((await request('state')).body.state.shoppingItems.find(x=>x.id===product.id).done);
+ assert.equal((await request('saveShoppingItem',{...grocery,id:product.id,revision:1})).status,409,'stale edits rejected');
+ assert.equal((await request('deleteShoppingItem',{id:product.id,revision:1})).status,409,'stale deletes rejected');
+ assert.equal((await request('saveShoppingItem',{title:'',quantity:'1'})).status,400);
+ const edited=await request('saveShoppingItem',{...grocery,id:product.id,revision:product.revision,quantity:'3 litre'});assert.equal(edited.status,200);product=edited.body.state.shoppingItems.find(x=>x.id===product.id);
+ const reopened=await request('setShoppingDone',{id:product.id,revision:product.revision,done:false});assert.equal(reopened.status,200);product=reopened.body.state.shoppingItems.find(x=>x.id===product.id);assert.equal(product.doneBy,null);
+ assert.equal((await request('deleteShoppingItem',{id:product.id,revision:product.revision})).status,200);
+ use(admin);assert.ok(!(await request('state')).body.state.shoppingItems.some(x=>x.id===product.id));
+ }
  use(admin);assert.equal((await request('setupAccounts',{adminId:'u1',accounts})).status,409);
  assert.equal((await request('logout',{})).status,200);assert.equal((await request('state')).status,401);
  console.log('✓ HTTP personal login, migration, roles, ownership, privacy, CSRF, session rotation/revocation, concurrent draws/submissions/approvals, frozen points, reward debit and family scoring passed.');
