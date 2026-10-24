@@ -1,0 +1,2 @@
+// Restore the device preference before styles paint, without inline scripts.
+try{const a=JSON.parse(localStorage.getItem('homedojo-appearance-v1')||'{}');const m=['light','dark','system'].includes(a?.mode)?a.mode:'dark';document.documentElement.dataset.mode=m==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):m;document.documentElement.dataset.accent=['lavender','ocean','sage','rose'].includes(a?.accent)?a.accent:'lavender';}catch{document.documentElement.dataset.mode='dark';}

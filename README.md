@@ -145,3 +145,9 @@ Ebeveyn ana ekranı günlük görevler ve doğrudan onay içindir; takip ekranı
 Ebeveyn, bugünkü günlük görevleri başlangıç saati gelmeden de doğrudan onaylayabilir. Gerçek işlem zamanı ve erken onay bilgisi kaydedilir. Çocuğun kendi gönderiminde başlangıç saati kuralı sürer.
 
 Anne dahil ebeveynler Görev havuzu ekranından çocuklara özel veya ortak görev ekleyebilir. Mevcut görevleri düzenleme/silme ve kullanıcı yönetimi admin yetkisinde kalır.
+
+### Görünüm ve tablet menüsü
+
+Üst çubuktaki **Görünüm** veya **Hesabım → Görünümü değiştir** ile Açık, Koyu veya Sistem modu ve dört renk paleti seçilir. Tercih yalnızca bu tarayıcıda `homedojo-appearance-v1` anahtarında tutulur; aile verilerini değiştirmez. Sistem modu cihazın renk tercihini izler. Tabletlerde (601–1100 px) yazılı yan menü, telefonlarda alt menü kullanılır. Hareket azaltma tercihi desteklenir.
+
+Lucide ikonları sabit npm sürümünden yalnızca gereken SVG düğümleriyle derlenir; çalışma zamanında CDN gerektirmez. Güncellemek için `npm ci && npm run build:icons`. Lisans `licenses/LUCIDE.txt` içindedir. Yeni arayüz stilleri `APPEARANCE SYSTEM` altındaki anlamsal renk değişkenlerini kullanmalıdır. Önceki bileşenlerin açık tema renkleri `python3 scripts/build-theme-tokens.py` ile tekrar üretilebilir; koyu renkler yedek değer olarak korunur.
