@@ -19,9 +19,9 @@ self.addEventListener('fetch',event=>{
 });
 
 self.addEventListener('push',event=>{
- event.waitUntil(self.registration.showNotification('Yeni görevin var! 🎯',{
-  body:'HomeDojo’da seni bekleyen görevleri görmek için dokun.',
-  icon:'/icons/icon-192.png',badge:'/icons/icon-192.png',tag:'homedojo-new-task',renotify:true,
+ event.waitUntil(self.registration.showNotification('HomeDojo · Bir hatırlatman var 🔔',{
+  body:'Ajandanı ve seni bekleyen görevleri görmek için dokun.',
+  icon:'/icons/icon-192.png',badge:'/icons/icon-192.png',tag:'homedojo-reminder',renotify:true,
   data:{url:'/#profile'},vibrate:[180,80,180]
  }));
 });

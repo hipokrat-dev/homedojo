@@ -227,6 +227,20 @@ try{
  const parentPlan=await request('savePlan',{kind:'todo',title:'Kargoyu al',day:'2026-10-23',time:'15:30'});assert.equal(parentPlan.status,200);const parentPlanId=parentPlan.body.state.personalPlan.at(-1).id;
  use(admin);assert.ok(!(await request('state')).body.state.personalPlan.some(p=>p.id===parentPlanId));assert.equal((await request('deletePlan',{id:parentPlanId})).status,404);
  use(wishParent);assert.equal((await request('togglePlan',{id:parentPlanId})).status,200);assert.equal((await request('savePlan',{kind:'lesson',title:'Ders',day:'1'})).status,400);
+
+ const timed=await request('savePlan',{kind:'todo',title:'Hatırlat',day:'2026-12-30',time:'15:30',reminder:true});assert.equal(timed.status,200);assert.equal(timed.body.state.personalPlan.at(-1).reminder,true);
+ const invalidReminder=await request('savePlan',{kind:'todo',title:'Hata',day:'2026-12-30',time:'15:30',reminder:'yes'});assert.equal(invalidReminder.status,400);
+ const quick={title:'Su',amount:1.5,unit:'litre',requestId:crypto.randomUUID()};
+ assert.equal((await request('addShoppingProduct',quick,{'X-CSRF-Token':'bad'})).status,403);
+ const quickResult=await request('addShoppingProduct',quick);assert.equal(quickResult.status,200);assert.equal(quickResult.body.state.shoppingItems.at(-1).quantity,'1.5 litre');
+ const repeatQuick=await request('addShoppingProduct',quick);assert.equal(repeatQuick.body.state.shoppingItems.at(-1).quantity,'1.5 litre','retry does not add twice');
+ const increment=await request('addShoppingProduct',{...quick,requestId:crypto.randomUUID()});assert.equal(increment.body.state.shoppingItems.at(-1).quantity,'3 litre','repeated intentional tap increments');
+ assert.equal((await request('addShoppingProduct',{...quick,unit:'adet',requestId:crypto.randomUUID()})).status,400);
+ assert.equal((await request('saveShoppingFavorite',{title:'Su',unit:'litre',favorite:false})).status,200);
+ use(admin);assert.ok(!(await request('state')).body.state.shoppingFavorites.some(x=>x.title==='Su'),'favorites shared');
+ assert.equal((await request('saveShoppingFavorite',{title:'Elma',unit:'kg',favorite:true})).status,200);
+ use(other);assert.deepEqual((await request('state')).body.state.shoppingFavorites,[]);assert.equal((await request('addShoppingProduct',quick)).status,403);assert.equal((await request('saveShoppingFavorite',{title:'Elma',unit:'kg',favorite:false})).status,403);
+ use(wishParent);
  const grocery={title:'Süt',quantity:'2 litre',note:'Laktozsuz'};
  assert.equal((await request('saveShoppingItem',grocery,{'X-CSRF-Token':'bad'})).status,403);
  const added=await request('saveShoppingItem',grocery);assert.equal(added.status,200);let product=added.body.state.shoppingItems.at(-1);

@@ -20,7 +20,7 @@ final class TaskPush {
         return $this->db->query('SELECT * FROM homedojo_push_keys WHERE id=1')->fetch(PDO::FETCH_ASSOC);
     }
     public function subscribe(array $actor,array $input): void {
-        if(!in_array($actor['memberType']??'', ['child','young_child'],true))throw new AppError('Bildirimleri çocuğun hesabında açın.',403);
+        if(!in_array($actor['memberType']??'', ['child','young_child','parent'],true))throw new AppError('Bu hesap bildirim kullanamaz.',403);
         $endpoint=self::endpoint($input['endpoint']??null);$id=hash('sha256',$endpoint);
         $count=$this->db->prepare('SELECT COUNT(*) FROM homedojo_push_devices WHERE user_id=?');$count->execute([$actor['id']]);
         $existing=$this->db->prepare('SELECT id FROM homedojo_push_devices WHERE id=?');$existing->execute([$id]);
@@ -41,7 +41,7 @@ final class TaskPush {
         if(!openssl_sign($token,$signature,$keys['private_key'],OPENSSL_ALGO_SHA256))throw new RuntimeException('Push signing failed');
         return 'vapid t='.$token.'.'.self::b64(self::signature($signature)).', k='.$keys['public_key'];
     }
-    public function deliver(array $child,string $event,?callable $transport=null): array {
+    public function deliver(array $child,string $event,?callable $transport=null,int $ttl=86400): array {
         $q=$this->db->prepare('SELECT * FROM homedojo_push_devices WHERE user_id=? AND auth_version=?');$q->execute([$child['id'],$child['authVersion']]);$devices=$q->fetchAll(PDO::FETCH_ASSOC);$sent=0;$failed=0;
         foreach($devices as $device){
             $id=hash('sha256',$event.':'.$device['id']);
@@ -49,7 +49,7 @@ final class TaskPush {
             try{
                 $endpoint=self::endpoint($device['endpoint']);
                 if($transport)$status=$transport($endpoint,$this->authorization());
-                else{$ch=curl_init($endpoint);curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>'',CURLOPT_HTTPHEADER=>['Authorization: '.$this->authorization(),'TTL: 86400','Urgency: high','Content-Length: 0'],CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_CONNECTTIMEOUT=>3,CURLOPT_TIMEOUT=>5,CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS]);curl_exec($ch);$status=(int)curl_getinfo($ch,CURLINFO_RESPONSE_CODE);curl_close($ch);}
+                else{$ch=curl_init($endpoint);curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>'',CURLOPT_HTTPHEADER=>['Authorization: '.$this->authorization(),'TTL: '.max(0,min(86400,$ttl)),'Urgency: high','Content-Length: 0'],CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_CONNECTTIMEOUT=>3,CURLOPT_TIMEOUT=>5,CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS]);curl_exec($ch);$status=(int)curl_getinfo($ch,CURLINFO_RESPONSE_CODE);curl_close($ch);}
                 if($status>=200&&$status<300)$sent++;
                 elseif(in_array($status,[404,410],true))$this->remove($device['id'],$child['id']);
                 else{$failed++;$this->db->prepare('DELETE FROM homedojo_push_sent WHERE id=?')->execute([$id]);}

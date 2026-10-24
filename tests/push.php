@@ -17,5 +17,5 @@ ensure($push->deliver(array_replace($child,['authVersion'=>2]),'b',$ok)['devices
 ensure($push->deliver($child,'b',fn()=>503)['failed']===1,'Failure recorded');ensure($push->deliver($child,'b',$ok)['sent']===1,'Failed delivery retry possible');
 $push->subscribe($other,['endpoint'=>$ep]);ensure($push->deliver($child,'c',$ok)['devices']===0,'Shared tablet rebound to current account');
 $push->deliver($other,'c',fn()=>410);ensure($push->deliver($other,'d',$ok)['devices']===0,'Expired subscriptions cleaned');
-try{$push->subscribe(['id'=>'u1','memberType'=>'parent'],['endpoint'=>$ep]);throw new RuntimeException('Parent subscribed');}catch(AppError $e){ensure($e->status===403,'Parent rejected');}
+$parent=['id'=>'u1','memberType'=>'parent','authVersion'=>1];$push->subscribe($parent,['endpoint'=>$ep]);ensure($push->deliver($parent,'plan:a',$ok,300)['sent']===1,'Parent agenda push supported');
 echo "Push keys, VAPID signature, endpoint restrictions, device ownership, revocation, deduplication, retries and expiry passed.\n";

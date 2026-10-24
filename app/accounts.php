@@ -50,7 +50,7 @@ function authorize_action(array $s,array $actor,string $action,array &$in): void
     }
 }
 function member_snapshot(array $s,array $actor): array {
-    $v=snapshot($s);$v['shoppingItems']=($actor['memberType']??'')==='parent'?($s['shoppingItems']??[]):[];$allAssignments=$v['assignments'];$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];$v['personalNotes']=$actor['personalNotes']??[];$v['personalPlan']=$actor['personalPlan']??[];$v['footballEnabled']=football_enabled($actor);$v['footballVideos']=$v['footballEnabled']?($actor['footballVideos']??[]):[];
+    $v=snapshot($s);unset($v['shoppingRequests']);$v['shoppingFavorites']=($actor['memberType']??'')==='parent'?($s['shoppingFavorites']??shopping_default_favorites()):[];$v['shoppingItems']=($actor['memberType']??'')==='parent'?($s['shoppingItems']??[]):[];$allAssignments=$v['assignments'];$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];$v['personalNotes']=$actor['personalNotes']??[];$v['personalPlan']=$actor['personalPlan']??[];$v['footballEnabled']=football_enabled($actor);$v['footballVideos']=$v['footballEnabled']?($actor['footballVideos']??[]):[];
     foreach($v['users'] as &$u){unset($u['personalNotes'],$u['footballVideos'],$u['personalPlan'],$u['passwordHash'],$u['authVersion'],$u['routineHistory'],$u['routineTrackingSince'],$u['routineTrackingAt']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
     $v['assignments']=array_values(array_filter($v['assignments'],fn($a)=>$a['userId']===$actor['id']||($a['reviewerId']??null)===$actor['id']));
     foreach(['completions','redemptions'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($a)=>$a['userId']===$actor['id']));
@@ -194,8 +194,9 @@ function personal_plan(array &$s,array $actor,string $action,array $in): void {
         if($kind==='lesson'){if(!is_string($day)||!preg_match('/^[1-7]$/D',$day))throw new AppError('Haftanın gününü seç.');}
         else {if(!is_string($day)||!preg_match('/^\d{4}-\d{2}-\d{2}$/D',$day)||!($d=DateTimeImmutable::createFromFormat('!Y-m-d',$day))||$d->format('Y-m-d')!==$day)throw new AppError('Geçerli tarih seç.');}
         if(!is_string($time)||($time!==''&&!preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/D',$time)))throw new AppError('Geçerli saat seç.');
+        $reminder=$in['reminder']??($index!==null?($items[$index]['reminder']??false):false);if(!is_bool($reminder))throw new AppError('Hatırlatma seçimi geçersiz.');
         if($index===null&&count($items)>=200)throw new AppError('En fazla 200 plan kaydedebilirsin. Eski işleri sil.');
-        $item=['id'=>$id??uid(),'title'=>trim($title),'kind'=>$kind,'day'=>$day,'time'=>$time,'done'=>$index!==null&&$kind==='todo'?($items[$index]['done']??false):false];
+        $item=['id'=>$id??uid(),'title'=>trim($title),'kind'=>$kind,'day'=>$day,'time'=>$time,'reminder'=>$kind==='todo'&&$time!==''&&$reminder,'done'=>$index!==null&&$kind==='todo'?($items[$index]['done']??false):false];
         if($index===null)$items[]=$item;else $items[$index]=$item;
     }
     $s['users'][$i]['personalPlan']=array_values($items);
@@ -246,3 +247,32 @@ function shopping_item(array &$s,array $actor,string $action,array $in): void {
     }else throw new AppError('Geçersiz alışveriş işlemi.');
     $s['shoppingItems']=array_values($items);
 }
+
+function shopping_quick_add(array &$s,array $actor,string $action,array $in): void {
+    if(($actor['memberType']??'')!=='parent')throw new AppError('Alışveriş listesi yalnızca ebeveynlere açık.',403);
+    $title=valid_text($in['title']??null,'Ürün adı',100);
+    $unit=$in['unit']??'adet';if(!in_array($unit,['adet','litre','kg','paket'],true))throw new AppError('Miktar birimini seç.');
+    $key=mb_strtolower($title,'UTF-8');
+    if($action==='saveShoppingFavorite'){
+        if(!is_bool($in['favorite']??null))throw new AppError('Favori durumu seç.');
+        $favorites=$s['shoppingFavorites']??shopping_default_favorites();
+        $favorites=array_values(array_filter($favorites,fn($x)=>mb_strtolower($x['title'],'UTF-8')!==$key));
+        if($in['favorite']){if(count($favorites)>=40)throw new AppError('En fazla 40 sık kullanılan ürün olabilir.');$favorites[]=['title'=>$title,'unit'=>$unit];}
+        $s['shoppingFavorites']=$favorites;return;
+    }
+    $request=valid_request($in['requestId']??null);$request=$actor['id'].':'.$request;
+    if(in_array($request,$s['shoppingRequests']??[],true))return;
+    $amount=$in['amount']??null;
+    if((!is_int($amount)&&!is_float($amount))||!is_finite((float)$amount)||$amount<=0||$amount>999||abs(round($amount,2)-$amount)>.000001||($unit==='adet'&&floor($amount)!=$amount))throw new AppError('Geçerli miktar gir; adet tam sayı olmalı.');
+    $items=$s['shoppingItems']??[];$index=null;
+    foreach($items as $j=>$item){
+        if(!$item['done']&&mb_strtolower($item['title'],'UTF-8')===$key&&preg_match('/^([0-9]+(?:[.,][0-9]+)?) '.preg_quote($unit,'/').'$/u',$item['quantity'],$m)){
+            $index=$j;$amount=round($amount+(float)str_replace(',','.',$m[1]),2);if($amount>999)throw new AppError('Toplam miktar en fazla 999 olabilir.');break;
+        }
+    }
+    $quantity=rtrim(rtrim(number_format($amount,2,'.',''),'0'),'.').' '.$unit;
+    shopping_item($s,$actor,'saveShoppingItem',['title'=>$title,'quantity'=>$quantity,'note'=>$index!==null?($items[$index]['note']??''):'']+($index!==null?['id'=>$items[$index]['id'],'revision'=>$items[$index]['revision']]:[]));
+    $s['shoppingRequests']=array_slice([...($s['shoppingRequests']??[]),$request],-300);
+}
+
+function shopping_default_favorites(): array {return [['title'=>'Süt','unit'=>'litre'],['title'=>'Su','unit'=>'litre'],['title'=>'Ekmek','unit'=>'adet'],['title'=>'Yumurta','unit'=>'adet']];}

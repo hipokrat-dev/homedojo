@@ -19,7 +19,7 @@ offlineMode=false;handlers.fetch({request:{url:'https://example.com/',method:'GE
 console.log('PWA manifest, PNG sizes, private-data isolation, offline fallback and cache cleanup passed.');
 let notification,opened,focused=false;
 context.self.registration={showNotification:async(title,options)=>notification={title,options}};
-handlers.push({waitUntil:p=>work=p});await work;assert.match(notification.title,/Yeni görevin/);assert.equal(notification.options.data.url,'/#profile');
+handlers.push({waitUntil:p=>work=p});await work;assert.match(notification.title,/hatırlatman/);assert.equal(notification.options.data.url,'/#profile');
 context.self.clients.matchAll=async()=>[];context.self.clients.openWindow=async url=>opened=url;
 handlers.notificationclick({notification:{close:()=>{}},waitUntil:p=>work=p});await work;assert.equal(opened,'https://example.com/#profile');
 context.self.clients.matchAll=async()=>[{url:'https://example.com/',navigate:async url=>opened=url,focus:async()=>focused=true}];

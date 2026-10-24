@@ -151,3 +151,12 @@ Anne dahil ebeveynler Görev havuzu ekranından çocuklara özel veya ortak gör
 Üst çubuktaki **Görünüm** veya **Hesabım → Görünümü değiştir** ile Açık, Koyu veya Sistem modu ve dört renk paleti seçilir. Tercih yalnızca bu tarayıcıda `homedojo-appearance-v1` anahtarında tutulur; aile verilerini değiştirmez. Sistem modu cihazın renk tercihini izler. Tabletlerde (601–1100 px) yazılı yan menü, telefonlarda alt menü kullanılır. Hareket azaltma tercihi desteklenir.
 
 Lucide ikonları sabit npm sürümünden yalnızca gereken SVG düğümleriyle derlenir; çalışma zamanında CDN gerektirmez. Güncellemek için `npm ci && npm run build:icons`. Lisans `licenses/LUCIDE.txt` içindedir. Yeni arayüz stilleri `APPEARANCE SYSTEM` altındaki anlamsal renk değişkenlerini kullanmalıdır. Önceki bileşenlerin açık tema renkleri `python3 scripts/build-theme-tokens.py` ile tekrar üretilebilir; koyu renkler yedek değer olarak korunur.
+
+
+### Hızlı alışveriş ve ajanda
+
+Alışverişte Sık kullanılanlar, Market ve Sebze & meyve şeritleri vardır. Ürüne dokunmak seçilen miktarı ortak listeye ekler; süt/su litre, sebze/meyve kg, adetle satılan ürünler tam sayı kullanır. Yıldızlar aile içinde paylaşılır. Aynı alınmamış ürün ve birim yeniden eklenirse miktarı artar; ağ yeniden denemesi aynı isteği ikinci kez eklemez. Alınanlar ayrı sekmededir.
+
+Ebeveyn Ajandam ekranı gün, hafta ve ay görünümünü ve seçilen günün saatli işlerini gösterir. Kayıtlar kişiseldir. Saatli işte **Saati gelince hatırlat** seçilebilir; uygulama açıkken ekran içi uyarı çıkar. Cihaz bildirimi için her cihazda **Hesabım → Bildirimleri aç** gerekir. Bildirim hizmeti mevcut Android Chrome/FCM aboneliklerini kullanır. Kilit ekranında işin özel başlığı paylaşılmaz; uygulamaya dokunarak açılır.
+
+Uygulama kapalıyken ajanda hatırlatmaları için Hostinger Cron Jobs bölümünde PHP türüyle `public_html/app/reminders.php` dosyasını her dakika çalıştırın (`* * * * *`). Dosya HTTP üzerinden çalışmaz; web uygulamasıyla aynı özel veritabanı yapılandırmasını kullanır. İşler İstanbul saatinde değerlendirilir, beş dakika içinde yeniden denenir, tamamlanan/devre dışı bırakılan işler gönderilmez. Abonelik ve olay başına tek gönderim mevcut push kayıtlarıyla korunur. Cihazın internet ve bildirim izinlerine bağlı olarak teslim gecikebilir. Kontrol: `php tests/reminders.php`, `php tests/push.php`, `node tests/http.mjs`, `node tests/pwa.mjs`.
