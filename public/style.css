@@ -1000,4 +1000,4 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.parent-layout button
 
 .note-composer .note-voice{margin:0 0 16px}.note-composer .composer-intro{margin-bottom:16px}
 
-.note-mic-help{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}.note-mic-help summary{cursor:pointer;font-weight:600;font-size:12px;padding:6px 0;color:var(--text)}.note-mic-help .secondary{width:100%;margin-top:10px}.note-mic-help p{font-size:12px;line-height:1.65;overflow-wrap:anywhere}.note-mic-help [data-note-mic-status]{color:var(--text)}
+.note-voice{padding:8px 0;border:0;background:transparent}.note-voice-actions{gap:8px;align-items:center}.note-voice-actions .secondary{flex:0 1 auto;padding:8px 12px;font-size:12px}.note-voice-actions .note-mic-enable{flex:0 0 auto;padding:6px 8px;font-size:11px;min-height:44px;white-space:normal}.note-voice p:empty{display:none}.note-voice p{margin:6px 0 0;font-size:11px}.note-composer .note-voice{margin:0 0 12px}
