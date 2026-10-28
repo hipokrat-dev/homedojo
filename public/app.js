@@ -481,7 +481,7 @@ function formatSpokenNote(base,text){
  const words=['bir','iki','üç','dört','beş','altı','yedi','sekiz','dokuz','on','on bir','on iki','on üç','on dört','on beş','on altı','on yedi','on sekiz','on dokuz','yirmi'];
  const ordinals=['birinci','ikinci','üçüncü','dördüncü','beşinci','altıncı','yedinci','sekizinci','dokuzuncu','onuncu'];
  const names=[...words,...ordinals].sort((a,b)=>b.length-a.length).join('|');
- const matcher=new RegExp('(^|[\\s,;.!?])('+names+'|[1-9][0-9]?)(?:[.)])?(?:\\s+madde(?:si)?[.:]?)?(?=\\s|$)','giu');
+ const matcher=new RegExp('(^|[\\s,;.!?])('+names+'|[1-9][0-9]?)(?:[.):,])?(?:\\s+madde(?:si)?[.:]?)?(?=\\s|$)','giu');
  const markers=[];let match;
  while((match=matcher.exec(text))){
   const word=match[2].toLocaleLowerCase('tr-TR').replace(/\s+/g,' '),number=/^\d+$/.test(word)?Number(word):words.includes(word)?words.indexOf(word)+1:ordinals.indexOf(word)+1;

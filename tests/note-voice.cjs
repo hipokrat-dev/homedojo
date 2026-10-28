@@ -28,6 +28,7 @@ function setup(){
  t=setup();t.body.value='a'.repeat(2998);t.dictate.onclick();t.sessions[0].onresult(t.event(['uzun cümle']));assert.equal(t.body.value.length,3000);assert(!t.body.readOnly);
  t=setup();const format=t.context.formatSpokenNote;
  assert.equal(format('', 'bir kitap oku iki ödev yap üç çantanı hazırla'), '1. kitap oku\n2. ödev yap\n3. çantanı hazırla');
+ assert.equal(format('', '1, kitap oku 2: ödev yap'), '1. kitap oku\n2. ödev yap');
  assert.equal(format('', '1 kitap oku 2 ödev yap'), '1. kitap oku\n2. ödev yap');
  assert.equal(format('', 'Birinci madde kitabı oku ikinci madde deftere yaz'), '1. kitabı oku\n2. deftere yaz');
  assert.equal(format('', 'Bugün bir kitap ve iki defter aldım.'), 'Bugün bir kitap ve iki defter aldım.');
