@@ -160,3 +160,11 @@ Alışverişte Sık kullanılanlar, Market ve Sebze & meyve şeritleri vardır. 
 Ebeveyn Ajandam ekranı gün, hafta ve ay görünümünü ve seçilen günün saatli işlerini gösterir. Kayıtlar kişiseldir. Saatli işte **Saati gelince hatırlat** seçilebilir; uygulama açıkken ekran içi uyarı çıkar. Cihaz bildirimi için her cihazda **Hesabım → Bildirimleri aç** gerekir. Bildirim hizmeti mevcut Android Chrome/FCM aboneliklerini kullanır. Kilit ekranında işin özel başlığı paylaşılmaz; uygulamaya dokunarak açılır.
 
 Uygulama kapalıyken ajanda hatırlatmaları için Hostinger Cron Jobs bölümünde PHP türüyle `public_html/app/reminders.php` dosyasını her dakika çalıştırın (`* * * * *`). Dosya HTTP üzerinden çalışmaz; web uygulamasıyla aynı özel veritabanı yapılandırmasını kullanır. İşler İstanbul saatinde değerlendirilir, beş dakika içinde yeniden denenir, tamamlanan/devre dışı bırakılan işler gönderilmez. Abonelik ve olay başına tek gönderim mevcut push kayıtlarıyla korunur. Cihazın internet ve bildirim izinlerine bağlı olarak teslim gecikebilir. Kontrol: `php tests/reminders.php`, `php tests/push.php`, `node tests/http.mjs`, `node tests/pwa.mjs`.
+
+### Somut ve soyut kavram çalışma kartları
+
+Büyük çocuk hesabında **Sayfam → Somut mu, soyut mu?** üzerinden 100 sıralı Türkçe kart açılır. İlk 60 kart sözcük, son 40 kart cümlede kullanım çalışmasıdır; toplam 50 somut ve 50 soyut örnek vardır. Her cevap sonrasında doğru sınıflama ve kısa açıklama gösterilir. Önceki kartlar incelenebilir; 100. karttan sonra sonuç ve yanlış cevapların açıklamaları görüntülenir.
+
+İlerleme mevcut veritabanında kullanıcıya özel `conceptStudyV1` alanında saklanır; sekme/cihaz değişince devam eder. İlk cevap geçerlidir, aynı isteğin tekrarı veya iki cihazdan gönderim ikinci ilerleme oluşturmaz. Kartlar atlanamaz. Bu eğitim çalışması aile ödül puanını değiştirmez. Küçük çocuk ve ebeveyn hesapları cevap gönderemez; diğer kullanıcıların ham çalışma kayıtları paylaşılmaz. Sürüm 1 kart kimliklerini/sırasını değiştirmeyin; yeni set için ayrı sürüm alanı kullanın.
+
+Doğrulama: `php tests/study.php`, `node tests/http.mjs`.

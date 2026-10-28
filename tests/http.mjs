@@ -239,6 +239,15 @@ try{
  assert.equal((await request('saveShoppingFavorite',{title:'Su',unit:'litre',favorite:false})).status,200);
  use(admin);assert.ok(!(await request('state')).body.state.shoppingFavorites.some(x=>x.title==='Su'),'favorites shared');
  assert.equal((await request('saveShoppingFavorite',{title:'Elma',unit:'kg',favorite:true})).status,200);
+ use(other);
+ const deck=(await request('state')).body.state.conceptStudy;assert.equal(deck.total,100);assert.equal(deck.completed,0);assert.ok(!('answer' in deck.cards[0]));
+ assert.equal((await request('answerConceptCard',{cardId:'k001',choice:'somut'},{'X-CSRF-Token':'bad'})).status,403);
+ assert.equal((await request('answerConceptCard',{cardId:'k002',choice:'somut'})).status,409);
+ assert.equal((await request('answerConceptCard',{cardId:'k001',choice:'somut',userId:'u1'})).status,403);
+ const studied=await request('answerConceptCard',{cardId:'k001',choice:'somut'});assert.equal(studied.status,200);assert.equal(studied.body.state.conceptStudy.completed,1);assert.ok(studied.body.state.conceptStudy.cards[0].explanation);
+ assert.equal((await request('answerConceptCard',{cardId:'k001',choice:'soyut'})).body.state.conceptStudy.completed,1);
+ assert.equal((await request('state')).body.state.conceptStudy.cards[0].response,'somut');
+ use(admin);assert.equal((await request('state')).body.state.conceptStudy,null);assert.equal((await request('answerConceptCard',{cardId:'k001',choice:'somut'})).status,403);
  use(other);assert.deepEqual((await request('state')).body.state.shoppingFavorites,[]);assert.equal((await request('addShoppingProduct',quick)).status,403);assert.equal((await request('saveShoppingFavorite',{title:'Elma',unit:'kg',favorite:false})).status,403);
  use(wishParent);
  const grocery={title:'Süt',quantity:'2 litre',note:'Laktozsuz'};
