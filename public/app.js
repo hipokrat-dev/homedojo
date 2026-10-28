@@ -475,12 +475,38 @@ function noteSpeechText(results){
  }
  return parts.join(' ');
 }
+// Treat an ordered "bir ... iki ..." sequence as a list, keeping the raw
+// dictated text separate so later browser sessions can complete the sequence.
+function formatSpokenNote(base,text){
+ const words=['bir','iki','üç','dört','beş','altı','yedi','sekiz','dokuz','on','on bir','on iki','on üç','on dört','on beş','on altı','on yedi','on sekiz','on dokuz','yirmi'];
+ const ordinals=['birinci','ikinci','üçüncü','dördüncü','beşinci','altıncı','yedinci','sekizinci','dokuzuncu','onuncu'];
+ const names=[...words,...ordinals].sort((a,b)=>b.length-a.length).join('|');
+ const matcher=new RegExp('(^|[\\s,;.!?])('+names+'|[1-9][0-9]?)(?:[.)])?(?:\\s+madde(?:si)?[.:]?)?(?=\\s|$)','giu');
+ const markers=[];let match;
+ while((match=matcher.exec(text))){
+  const word=match[2].toLocaleLowerCase('tr-TR').replace(/\s+/g,' '),number=/^\d+$/.test(word)?Number(word):words.includes(word)?words.indexOf(word)+1:ordinals.indexOf(word)+1;
+  const rest=text.slice(matcher.lastIndex).trimStart();
+  // Quantities and durations inside an item are not new numbered items.
+  if(/^(?:litre|kilogram|kilo|gram|kg|ml|metre|santim|saat|dakika|saniye|gün|hafta|ay|yıl|lira|tl|adet|tane)(?:\s|[.,!?;]|$)/iu.test(rest)&&!ordinals.includes(word)&&!match[0].includes('madde'))continue;
+  markers.push({number,start:match.index+match[1].length,end:matcher.lastIndex,explicit:ordinals.includes(word)||/madde/iu.test(match[0])});
+ }
+ const existing=[...base.matchAll(/(?:^|\n)(\d+)\. /g)].at(-1),expected=existing?Number(existing[1])+1:1;
+ const first=markers.find(m=>m.number===expected&&text.slice(0,m.start).trim()==='');
+ let formatted=text,isList=false;
+ if(first){
+  const selected=[first];for(const marker of markers){if(marker.start>selected.at(-1).start&&marker.number===selected.at(-1).number+1)selected.push(marker);}
+  if(selected.length>=2||first.explicit||existing){
+   formatted=selected.map((m,i)=>{const content=text.slice(m.end,selected[i+1]?.start??text.length).trim().replace(/[,;]$/u,'');return `${m.number}. ${content}`;}).join('\n');isList=true;
+  }
+ }
+ return base+(base&&formatted?(isList?'\n':/\s$/.test(base)?'':' '):'')+formatted;
+}
 function bindNoteVoice(getText,body=null){
  const speak=modal.querySelector('[data-note-speak]'),dictate=modal.querySelector('[data-note-dictate]'),status=modal.querySelector('[data-note-voice-status]');
  const micButton=modal.querySelector('[data-note-mic-enable]');
  const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition,synth=window.speechSynthesis;
  let recognition=null,utterance=null,disposed=false,reading=false;
- let permissionCheck=0,listening=false,restartTimer=null,idleTimer=null,rapidEnds=0;
+ let permissionCheck=0,listening=false,restartTimer=null,idleTimer=null,rapidEnds=0,dictationBase='',dictationText='';
  const say=text=>{if(!disposed)status.textContent=text;};
  function stopReading(){reading=false;if(utterance){utterance.onend=null;utterance.onerror=null;utterance=null;synth.cancel();}speak.setAttribute('aria-pressed','false');speak.innerHTML='🔊 Sesli oku';}
  function stopListening(){
@@ -522,7 +548,7 @@ function bindNoteVoice(getText,body=null){
   if(dictate.disabled)say('Sesle yazma desteklenmiyor. Chrome veya klavyenin mikrofonunu kullan.');
   function startRecognition(){
    if(!listening||disposed||document.hidden)return;
-   const base=body.value,current=new Recognition(),started=Date.now();let received=false;
+   const priorText=dictationText,current=new Recognition(),started=Date.now();let received=false;
    recognition=current;current.lang='tr-TR';current.continuous=true;current.interimResults=true;
    current.onstart=()=>{if(recognition===current)say('Dinliyorum… Bitirmek için Durdur’a dokun.');};
    current.onresult=e=>{
@@ -530,7 +556,8 @@ function bindNoteVoice(getText,body=null){
     // Each event contains the full session result list, including revised interim text.
     const text=noteSpeechText(e.results);
     if(text){received=true;rapidEnds=0;resetIdle();}
-    body.value=(base+(base&&text&&!/\s$/.test(base)?' ':'')+text).slice(0,body.maxLength);
+    dictationText=priorText+(priorText&&text?' ':'')+text;
+    body.value=formatSpokenNote(dictationBase,dictationText).slice(0,body.maxLength);
     body.dispatchEvent(new Event('input',{bubbles:true}));
     say('Dinliyorum… Bitirmek için Durdur’a dokun.');
     if(body.value.length>=body.maxLength){stopListening();say('3.000 karakter sınırına ulaşıldı.');}
@@ -553,7 +580,7 @@ function bindNoteVoice(getText,body=null){
   dictate.onclick=()=>{
    if(listening){stopListening();say('Dinleme tamamlandı.');return;}
    if(body.value.length>=body.maxLength){say('Notun 3.000 karakter sınırına ulaştı.');return;}
-   stopReading();listening=true;rapidEnds=0;body.readOnly=true;dictate.textContent='■ Durdur';dictate.setAttribute('aria-pressed','true');say('Mikrofon hazırlanıyor…');resetIdle();startRecognition();
+   stopReading();dictationBase=body.value;dictationText='';listening=true;rapidEnds=0;body.readOnly=true;dictate.textContent='■ Durdur';dictate.setAttribute('aria-pressed','true');say('Mikrofon hazırlanıyor…');resetIdle();startRecognition();
   };
  }
  const hide=()=>{if(document.hidden){stopListening();stopReading();say('Ses işlemi durduruldu.');}};
