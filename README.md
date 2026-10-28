@@ -163,7 +163,7 @@ Uygulama kapalıyken ajanda hatırlatmaları için Hostinger Cron Jobs bölümü
 
 ### Somut ve soyut kavram çalışma kartları
 
-Büyük çocuk hesabında **Sayfam → Somut mu, soyut mu?** üzerinden 100 sıralı Türkçe kart açılır. İlk 60 kart sözcük, son 40 kart cümlede kullanım çalışmasıdır; toplam 50 somut ve 50 soyut örnek vardır. Her cevap sonrasında doğru sınıflama ve kısa açıklama gösterilir. Önceki kartlar incelenebilir; 100. doğru karttan sonra sonuç ve derece görüntülenir. Yanlış cevap turu bitirir.
+Büyük çocuk hesabında **Günlük görevler → Somut mu, soyut mu?** üzerinden 100 sıralı Türkçe kart açılır. İlk 60 kart sözcük, son 40 kart cümlede kullanım çalışmasıdır; toplam 50 somut ve 50 soyut örnek vardır. Her cevap sonrasında doğru sınıflama ve kısa açıklama gösterilir. Önceki kartlar incelenebilir; 100. doğru karttan sonra sonuç ve derece görüntülenir. Yanlış cevap turu bitirir.
 
 İlerleme mevcut veritabanında kullanıcıya özel `conceptStudyV1` alanında saklanır; sekme/cihaz değişince devam eder. İlk cevap geçerlidir, aynı isteğin tekrarı veya iki cihazdan gönderim ikinci ilerleme oluşturmaz. Kartlar atlanamaz. Bu eğitim çalışması aile ödül puanını değiştirmez. Küçük çocuk ve ebeveyn hesapları cevap gönderemez; diğer kullanıcıların ham çalışma kayıtları paylaşılmaz. Sürüm 1 kart kimliklerini/sırasını değiştirmeyin; yeni set için ayrı sürüm alanı kullanın.
 
