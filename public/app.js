@@ -461,11 +461,13 @@ function notesPanel(){
 }
 // Voice controls are scoped to the open note; no audio is stored by HomeDojo.
 let disposeNoteVoice=()=>{};
-function noteVoiceMarkup(dictation=false){return `<div class="note-voice"><div class="note-voice-actions">${dictation?'<button type="button" class="secondary" data-note-dictate aria-pressed="false">🎙 Sesle yaz</button>':''}<button type="button" class="secondary" data-note-speak aria-pressed="false">🔊 Sesli oku</button></div><p class="quiet" data-note-voice-status role="status" aria-live="polite">${dictation?'Konuşman metne dönüşür. Tarayıcın sesini işlemek için çevrimiçi hizmet kullanabilir.':'Notunu dinlemek için sesli okuya dokun.'}</p></div>`;}
+function noteVoiceMarkup(dictation=false){return `<div class="note-voice"><div class="note-voice-actions">${dictation?'<button type="button" class="secondary" data-note-dictate aria-pressed="false">🎙 Sesle yaz</button>':''}<button type="button" class="secondary" data-note-speak aria-pressed="false">🔊 Sesli oku</button></div><p class="quiet" data-note-voice-status role="status" aria-live="polite">${dictation?'Konuşman metne dönüşür. Tarayıcın sesini işlemek için çevrimiçi hizmet kullanabilir.':'Notunu dinlemek için sesli okuya dokun.'}</p>${dictation?'<details class="note-mic-help" data-note-mic-help><summary>Mikrofon ayarları ve yardım</summary><p>Sesle yazmak için bu cihazda mikrofon izni ver. Bu kontrol ses kaydetmez; mikrofonu açıp hemen kapatır.</p><button type="button" class="secondary" data-note-mic-enable>Mikrofonu etkinleştir</button><p data-note-mic-status role="status" aria-live="polite">İzin bu cihaz ve tarayıcı için geçerlidir.</p><p><strong>Android tablet:</strong> İzin penceresi açılmazsa siteyi doğrudan Chrome’da aç. Chrome’da adresin yanındaki site simgesinden İzinler → Mikrofon’u kontrol et. Tablet Ayarları → Uygulamalar → Chrome → İzinler bölümünde Mikrofon’a izin ver; tabletin genel mikrofon erişimi de açık olmalı.</p><p><strong>Mac:</strong> Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon bölümünden kullandığın tarayıcıya izin ver. Sonra sitenin mikrofon iznini kontrol et.</p><p>“Sesle yaz” pasifse tarayıcı konuşmayı metne çevirmeyi desteklemiyor olabilir. Chrome’da dene veya ekran klavyesinin mikrofonunu kullan. Mikrofon izni tek başına bu desteği eklemez.</p><p>Uygulama simgesinden açtıysan Chrome’da <strong>https://yapeglen.com</strong> adresini açıp yeniden dene. Bu notu önce kaydet.</p></details>':''}</div>`;}
 function bindNoteVoice(getText,body=null){
  const speak=modal.querySelector('[data-note-speak]'),dictate=modal.querySelector('[data-note-dictate]'),status=modal.querySelector('[data-note-voice-status]');
+ const micButton=modal.querySelector('[data-note-mic-enable]'),micHelp=modal.querySelector('[data-note-mic-help]'),micStatus=modal.querySelector('[data-note-mic-status]');
  const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition,synth=window.speechSynthesis;
  let recognition=null,utterance=null,disposed=false,reading=false;
+ let permissionCheck=0;
  const say=text=>{if(!disposed)status.textContent=text;};
  function stopReading(){reading=false;if(utterance){utterance.onend=null;utterance.onerror=null;utterance=null;synth.cancel();}speak.setAttribute('aria-pressed','false');speak.innerHTML='🔊 Sesli oku';}
  function stopListening(){if(!recognition)return;const current=recognition;recognition=null;current.onresult=null;current.onend=null;current.onerror=null;current.onstart=null;try{current.abort();}catch{}body.readOnly=false;dictate.disabled=false;dictate.textContent='🎙 Sesle yaz';dictate.setAttribute('aria-pressed','false');}
@@ -479,8 +481,25 @@ function bindNoteVoice(getText,body=null){
   reading=true;speak.textContent='■ Okumayı durdur';speak.setAttribute('aria-pressed','true');say('Notun okunuyor…');
   function next(){if(disposed||!reading)return;if(index>=chunks.length){stopReading();say('Okuma tamamlandı.');return;}utterance=new SpeechSynthesisUtterance(chunks[index++]);utterance.lang='tr-TR';const voice=synth.getVoices().find(v=>v.lang.toLowerCase().startsWith('tr'));if(voice)utterance.voice=voice;utterance.onend=next;utterance.onerror=()=>{stopReading();say('Sesli okuma başlatılamadı. Cihazının ses ayarlarını kontrol et.');};synth.speak(utterance);}next();
  };
+ if(micButton){
+  micButton.onclick=async()=>{
+   stopListening();stopReading();micHelp.open=true;
+   if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia){micStatus.textContent='Bu ortam mikrofon izni isteyemiyor. Siteyi HTTPS adresiyle doğrudan Chrome’da aç.';return;}
+   const attempt=++permissionCheck;micButton.disabled=true;micStatus.textContent='Tarayıcının izin penceresinde İzin ver seçeneğine dokun. Pencere görünmüyorsa aşağıdaki adımları izle.';
+   try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    stream.getTracks().forEach(track=>track.stop());
+    if(disposed||attempt!==permissionCheck)return;
+    micStatus.textContent=Recognition?'Mikrofon erişimi açık. Şimdi Sesle yaz düğmesine dokunabilirsin.':'Mikrofon erişimi açık; ancak bu tarayıcı sesle yazmayı desteklemiyor. Chrome veya klavyenin mikrofonunu kullan.';
+   }catch(error){
+    if(disposed||attempt!==permissionCheck)return;
+    micStatus.textContent=({'NotAllowedError':'İzin verilmedi veya cihaz ayarlarında engellendi. Aşağıdaki Android / Mac adımlarını izle, sonra yeniden dene.','NotFoundError':'Mikrofon bulunamadı. Cihazın mikrofonunu kontrol et.','NotReadableError':'Mikrofon kullanılamıyor. Mikrofonu kullanan diğer uygulamaları kapatıp yeniden dene.'})[error.name]||'Mikrofon açılamadı. Aşağıdaki cihaz ayarlarını kontrol edip yeniden dene.';
+   }finally{if(!disposed&&attempt===permissionCheck)micButton.disabled=false;}
+  };
+ }
  if(dictate){
   dictate.disabled=!Recognition||!window.isSecureContext;
+  if(dictate.disabled&&micHelp)micHelp.open=true;
   if(dictate.disabled)say('Bu tarayıcı sesle yazmayı desteklemiyor. Klavyeyle yazabilir veya klavyenin mikrofonunu kullanabilirsin.');
   dictate.onclick=()=>{
    if(recognition){dictate.disabled=true;recognition.stop();return;}
@@ -488,7 +507,7 @@ function bindNoteVoice(getText,body=null){
    stopReading();let failed=false;const current=new Recognition();recognition=current;current.lang='tr-TR';current.continuous=true;current.interimResults=true;body.readOnly=true;dictate.textContent='■ Dinlemeyi bitir';dictate.setAttribute('aria-pressed','true');say('Mikrofon hazırlanıyor…');
    current.onstart=()=>say('Dinliyorum… Bitirince dinlemeyi bitire dokun.');
    current.onresult=e=>{if(disposed||recognition!==current)return;let interim='';for(let i=e.resultIndex;i<e.results.length;i++){const text=e.results[i][0].transcript.trim();if(e.results[i].isFinal){const addition=(body.value&&!/\s$/.test(body.value)?' ':'')+text;body.value=(body.value+addition).slice(0,body.maxLength);body.dispatchEvent(new Event('input',{bubbles:true}));}else interim+=text+' ';}say(interim?'Duyulan: '+interim:'Dinliyorum…');if(body.value.length>=body.maxLength){failed=true;say('3.000 karakter sınırına ulaşıldı. Metnini kontrol edip kaydedebilirsin.');current.stop();}};
-   current.onerror=e=>{failed=true;say(({ 'not-allowed':'Mikrofon izni verilmedi. Tarayıcının site ayarlarından mikrofonu açabilirsin.','audio-capture':'Mikrofon bulunamadı veya başka bir uygulama tarafından kullanılıyor.','network':'Bağlantı kurulamadı. İnternet bağlantını kontrol edip tekrar dene.','no-speech':'Ses duyulmadı. Tekrar deneyebilirsin.','aborted':'Dinleme durduruldu.'})[e.error]||'Sesle yazma şu anda kullanılamıyor. Yazdıkların korundu.');};
+   current.onerror=e=>{failed=true;if(micHelp&&['not-allowed','service-not-allowed','audio-capture'].includes(e.error))micHelp.open=true;say(({ 'not-allowed':'Mikrofon izni verilmedi. Aşağıdaki Mikrofonu etkinleştir düğmesini kullan.','service-not-allowed':'Tarayıcı konuşma tanıma hizmetine izin vermiyor. Chrome veya klavyenin mikrofonunu dene.','audio-capture':'Mikrofon bulunamadı veya başka bir uygulama tarafından kullanılıyor.','network':'Bağlantı kurulamadı. İnternet bağlantını kontrol edip tekrar dene.','no-speech':'Ses duyulmadı. Tekrar deneyebilirsin.','aborted':'Dinleme durduruldu.'})[e.error]||'Sesle yazma şu anda kullanılamıyor. Yazdıkların korundu.');};
    current.onend=()=>{if(recognition!==current)return;recognition=null;body.readOnly=false;dictate.disabled=false;dictate.textContent='🎙 Sesle yaz';dictate.setAttribute('aria-pressed','false');if(!failed)say('Dinleme bitti. Metni kontrol edip notunu kaydet.');};
    try{current.start();}catch{stopListening();say('Mikrofon başlatılamadı. Tekrar deneyebilirsin.');}
   };
