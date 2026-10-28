@@ -38,13 +38,23 @@ try{
  async function loginAs(n){cookie='';csrf=(await request('session')).body.csrf;const r=await request('login',{username:'member'+n,password:'test-password-123'});assert.equal(r.status,200);csrf=r.body.csrf;return {cookie,csrf};}
  const member=await loginAs(2),other=await loginAs(3);
  function use(client){cookie=client.cookie;csrf=client.csrf;}
+ // Seed historical assignments directly so their approval/history regression coverage remains.
+ // Public task-wheel requests are retired; production clients cannot call this test helper.
+ function legacyAssignment(userId,requestId){
+  const code=`require $argv[1].'/app/store.php'; $store=new Store(require $argv[1].'/app/config.local.php'); $result=[]; $store->update(function(array &$s)use(&$result,$argv){$result=spin($s,$argv[2],'all',$argv[3],null,true);}); echo json_encode($result);`;
+  return {status:200,body:JSON.parse(execFileSync('php',['-r',code,dir,userId,requestId],{encoding:'utf8'}))};
+ }
+
  use(member);
+ const beforeRetiredWheel=(await request('state')).body.state.assignments.length;
+ assert.equal((await request('spin',{requestId:'retired-wheel-123456'})).status,410);
+ assert.equal((await request('state')).body.state.assignments.length,beforeRetiredWheel);
  const ownState=(await request('state')).body.state;const ownReward=ownState.rewards[0].id;assert.equal(ownState.tasks.length,10);assert.equal(ownState.rewards.length,4);assert.ok(ownState.tasks.every(t=>t.ownerId==='u2'));assert.ok(ownState.rewards.every(r=>r.ownerId==='u2'));
  assert.equal((await request('selectGoal',{rewardId:'r1'})).status,403);assert.equal((await request('redeem',{rewardId:'r1',requestId:'other-reward-123456'})).status,403);
  for(const action of ['deleteTask','saveReward','deleteReward','saveUser','saveAccount','createCompetition','cancelCompetition','claimCompetition'])assert.equal((await request(action,{})).status,403,action+' requires admin');
- assert.equal((await request('spin',{userId:'u1',frequency:'all',requestId:'spoof-draw-12345678'})).status,403);
+ assert.equal((await request('spin',{userId:'u1',frequency:'all',requestId:'spoof-draw-12345678'})).status,410);
  assert.equal((await request('selectGoal',{rewardId:ownReward})).status,200);
- const draws=await Promise.all([request('spin',{frequency:'daily',requestId:'same-draw-1234567890'}),request('spin',{frequency:'daily',requestId:'same-draw-1234567890'})]);
+ const draws=await Promise.all([legacyAssignment('u2','same-draw-1234567890'),legacyAssignment('u2','same-draw-1234567890')]);
  assert.deepEqual(draws.map(r=>r.status),[200,200]);assert.equal(draws[0].body.assignment.id,draws[1].body.assignment.id);
  const a=draws[0].body.assignment;assert.equal(a.noDeadline,true,'New wheel assignments have no countdown');
  assert.equal((await request('complete',{assignmentId:a.id,reviewerId:'u2'})).status,403);
@@ -61,7 +71,7 @@ try{
  // Admin can manage templates without rewriting historical assignment values.
  const added=await request('saveTask',{ownerId:'u2',title:'Approval task',description:'',points:100,icon:'✨',frequency:'monthly'});assert.equal(added.status,200);const task=added.body.state.tasks.at(-1);
  for(const t of initial.tasks)assert.equal((await request('deleteTask',{id:t.id})).status,200);
- use(member);const frozen=(await request('spin',{frequency:'monthly',requestId:'monthly-draw-1234567'})).body.assignment;
+ use(member);const frozen=(await legacyAssignment('u2','monthly-draw-1234567')).body.assignment;
  use(admin);await request('saveTask',{...task,points:200});await request('deleteTask',{id:task.id});
  use(member);assert.equal((await request('complete',{assignmentId:frozen.id,reviewerId:'u1'})).status,200);
  use(admin);assert.equal((await request('reviewAssignment',{assignmentId:frozen.id,decision:'approve'})).status,200);
@@ -69,7 +79,7 @@ try{
  state=(await request('state')).body.state;assert.equal(state.users.find(u=>u.id==='u2').balance,a.points);assert.equal(state.completions.length,2);
  use(admin);const contest=(await request('createCompetition',{title:'Aile yarışı',prize:'Piknik',target:80,frequency:'weekly'})).body.state.competitions.at(-1);
  await request('saveTask',{ownerId:'u3',title:'Ortak görev',description:'',points:80,icon:'✨',frequency:'daily'});
- use(other);const shared=(await request('spin',{frequency:'daily',requestId:'shared-draw-1234567'})).body.assignment;
+ use(other);const shared=(await legacyAssignment('u3','shared-draw-1234567')).body.assignment;
  assert.equal((await request('complete',{assignmentId:shared.id,reviewerId:'u2'})).status,200);
  use(member);const won=await request('reviewAssignment',{assignmentId:shared.id,decision:'approve'});assert.equal(won.body.state.familyGoal.total,80);
  use(admin);const prize=await Promise.all([request('claimCompetition',{id:contest.id}),request('claimCompetition',{id:contest.id})]);assert.deepEqual(prize.map(r=>r.status).sort(),[200,409]);
@@ -114,7 +124,7 @@ try{
  assert.equal((await request('saveGames',{childId:littleId,names:['Forbidden']})).status,403);
  use(admin);assert.equal((await request('saveGames',{childId:littleId,names:['Saklambaç','Lego']})).status,200);use(little);
  assert.deepEqual((await request('state')).body.state.gameNames,['Saklambaç','Lego']);
- assert.equal((await request('spin',{frequency:'daily',requestId:'child-block-spin-12345'})).status,403);
+ assert.equal((await request('spin',{frequency:'daily',requestId:'child-block-spin-12345'})).status,410);
  assert.equal((await request('createAccount',{})).status,403);
  assert.equal((await request('archiveAccount',{id:'u1'})).status,403);
  assert.equal((await request('completeRoutine',{routineId:'all-day',day:'2000-01-01'})).status,409);
@@ -154,7 +164,7 @@ try{
  use(other);const observedState=(await request('state')).body.state;assert.equal(observedState.completions.filter(c=>c.taskId==='routine-observe-day').length,1);use(observingParent);
  // Parent-only supervision, arbitrary dates and observed wheel completion.
  const supervisingParent={cookie,csrf};use(admin);assert.equal((await request('saveTask',{ownerId:'u3',title:'Supervised wheel fixture',description:'',points:12,icon:'📚',frequency:'daily'})).status,200);use(other);
- const noGoalDraw=await request('spin',{frequency:'weekly',requestId:'supervised-wheel-123456'});assert.equal(noGoalDraw.status,200);assert.equal(noGoalDraw.body.assignment.noDeadline,true);
+ const noGoalDraw=await legacyAssignment('u3','supervised-wheel-123456');assert.equal(noGoalDraw.status,200);assert.equal(noGoalDraw.body.assignment.noDeadline,true);
  assert.equal((await request('complete',{assignmentId:noGoalDraw.body.assignment.id,reviewerId:'u4'})).status,403,'Child cannot request sibling approval');
  assert.equal((await request('reviewAssignment',{assignmentId:noGoalDraw.body.assignment.id,decision:'approve'})).status,403,'Child cannot approve tasks');
  use(supervisingParent);assert.ok((await request('state')).body.state.parentAssignments.some(a=>a.id===noGoalDraw.body.assignment.id));

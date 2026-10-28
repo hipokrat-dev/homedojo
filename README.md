@@ -170,3 +170,5 @@ Büyük çocuk hesabında **Sayfam → Somut mu, soyut mu?** üzerinden 100 sır
 Doğrulama: `php tests/study.php`, `node tests/http.mjs`.
 
 Çalışma kartları dikey yarışma görünümündedir. Her doğru yanıt 10 puan verir; yanlış yanıt turu bitirir ve açıklama ile örnek cümleyi gösterir. Çocuk “Başa dön” ile yeni tura geçer. 100 doğru yanıt sonunda da yeniden yarışılabilir. Dereceler: Bakır 0–390, Gümüş 400–690, Altın 700–890, Platin 900–1000. Son tur, en iyi skor ve devam eden tur kullanıcıya özel veritabanında saklanır. Tur numarası eski veya yinelenen isteklerin yeni ilerlemeyi bozmasını önler; yarışma puanları aile ödül bakiyesinden ayrıdır. Hareket azaltma tercihi desteklenir.
+
+Görev çarkı kaldırıldı: `#wheel` Sayfam’a yönlenir; çarktan görev alma bağlantıları gösterilmez ve `spin` API isteği 410 döner. Ebeveynin doğrudan görev ataması, eski görevlerin onayı ve puan geçmişi korunur. Küçük çocukların oyun çarkı bağımsızdır. Telefonda hesap ayarları alt menü yerine üstteki profil alanından açılır.

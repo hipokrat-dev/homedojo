@@ -53,6 +53,7 @@ try{
     if($action==='setupAccounts')throw new AppError('Kişisel hesaplar zaten oluşturuldu.',409);
     if($action==='pushKey'){if(!function_exists('curl_init')||!function_exists('openssl_pkey_new'))throw new AppError('Sunucuda bildirim desteği kullanılamıyor.',503);json_response(['publicKey'=>(new TaskPush($store->db))->keys()['public_key']]);}
     if(!$actor)throw new AppError('Kendi kullanıcı adın ve şifrenle giriş yap.',401);
+    if($action==='spin')throw new AppError('Görev çarkı kaldırıldı. Ebeveyninin atadığı görevleri Sayfam bölümünde takip edebilirsin.',410);
     if(in_array($action,['pushSubscribe','pushUnsubscribe','pushTest'],true)){
         $push=new TaskPush($store->db);
         if($action==='pushSubscribe'){$push->subscribe($actor,$input);json_response(['ok'=>true]);}
@@ -81,7 +82,6 @@ try{
         elseif(in_array($action,['savePlan','deletePlan','togglePlan'],true))personal_plan($s,$actor,$action,$input);
         elseif($action==='restartConceptStudy')restart_concept_study($s,$actor,$input);
         elseif($action==='answerConceptCard')answer_concept_card($s,$actor,$input);
-        elseif($action==='spin')$result=spin($s,$actor['id'],'all',valid_request($input['requestId']??null),null,true);
         elseif(in_array($action,['requestReward','reviewRewardRequest','cancelRewardRequest','deleteRewardRequest'],true))reward_wish($s,$actor,$action,$input);
         elseif($action==='saveAccount')save_account($s,$input);
         elseif($action==='createAccount')create_account($s,$input);

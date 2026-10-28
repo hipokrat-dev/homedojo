@@ -985,3 +985,13 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.parent-layout button
 [data-mode="dark"] .study-back.has-error .study-reveal-seal,[data-mode="dark"] .study-back.has-error .study-reveal-heading>p,[data-mode="dark"] .study-back.has-error .eyebrow{color:#ff9eaa}
 @media(max-width:600px){.study-reveal-heading{padding:24px 0 20px}.study-reveal-seal{width:60px;height:60px;font-size:36px}.study-flip-hint{font-size:11px}.study-face .study-card-bottom{gap:6px}}
 @media(prefers-reduced-motion:reduce){.study-flip.is-turning .study-rotor,.study-flip.is-turning .study-back.has-error{animation:none}}
+/* On phones, account settings live in the profile control, outside primary navigation. */
+@media(max-width:600px){
+ .calm-layout .nav button[data-nav="account"]{display:none}
+ .calm-layout .nav{justify-content:space-evenly;gap:6px;overflow-x:hidden}
+ .calm-layout .nav button{flex:1 1 0;min-width:0;min-height:58px;border-radius:16px;font-size:10px;gap:6px}
+ .calm-layout .nav button span{white-space:normal;line-height:1.25;text-align:center}
+ .calm-layout .top-profile{display:flex;align-items:center;gap:9px;min-height:44px;padding:5px 9px 5px 5px;border:1px solid var(--edge);border-radius:100px;background:var(--surface);font-weight:700;max-width:200px}
+ .calm-layout .top-profile:after{content:'⌄';font-size:15px;line-height:1;color:var(--muted);margin-left:3px}
+ .calm-layout .top-profile .mini-avatar{width:34px;height:34px;flex-shrink:0}
+}
