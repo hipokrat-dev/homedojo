@@ -995,3 +995,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.parent-layout button
  .calm-layout .top-profile:after{content:'⌄';font-size:15px;line-height:1;color:var(--muted);margin-left:3px}
  .calm-layout .top-profile .mini-avatar{width:34px;height:34px;flex-shrink:0}
 }
+
+.note-voice{margin-top:16px;padding:14px;border:1px solid var(--tone-ffffff12,#ffffff12);border-radius:16px;background:var(--tone-101219,#101219)}.note-voice-actions{display:flex;flex-wrap:wrap;gap:10px}.note-voice-actions button{min-height:44px;flex:1;white-space:nowrap}.note-voice-actions button[aria-pressed="true"]{border-color:var(--note-accent,#b8a5ff);background:color-mix(in srgb,var(--note-accent,#b8a5ff) 18%,transparent)}.note-voice p{margin:10px 0 0;font-size:12px;line-height:1.6}.note-voice button:disabled{opacity:.5;cursor:not-allowed}
+
+.note-composer .note-voice{margin:0 0 16px}.note-composer .composer-intro{margin-bottom:16px}
