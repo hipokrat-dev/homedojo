@@ -38,6 +38,20 @@ try{
  async function loginAs(n){cookie='';csrf=(await request('session')).body.csrf;const r=await request('login',{username:'member'+n,password:'test-password-123'});assert.equal(r.status,200);csrf=r.body.csrf;return {cookie,csrf};}
  const member=await loginAs(2),other=await loginAs(3);
  function use(client){cookie=client.cookie;csrf=client.csrf;}
+ // Aey's six shortcuts persist in account state; no other profile can read or edit them.
+ use(other);
+ const startSites=(await request('state')).body.state.siteSlots;
+ assert.equal(startSites.length,6);assert.equal(startSites.filter(Boolean).length,3);
+ const newSite={slot:3,previous:null,name:'Ders',url:'ders.example/konu'};
+ assert.equal((await request('savePersonalSite',{...newSite,slot:6})).status,400);
+ assert.equal((await request('savePersonalSite',{...newSite,url:'javascript:alert(1)'})).status,400);
+ assert.equal((await request('savePersonalSite',newSite)).status,200);
+ const saved=(await request('state')).body.state.siteSlots[3];assert.deepEqual(saved,{name:'Ders',url:'https://ders.example/konu'});
+ assert.equal((await request('savePersonalSite',newSite)).status,409);
+ use(admin);const hidden=(await request('state')).body.state;assert.ok(!('siteSlots' in hidden));assert.ok(hidden.users.every(u=>!('siteSlots' in u)));
+ assert.equal((await request('removePersonalSite',{slot:3,previous:saved})).status,403);
+ use(other);const updated=(await request('savePersonalSite',{...newSite,previous:saved,name:'Ödev'})).body.state.siteSlots[3];
+ assert.equal(updated.name,'Ödev');assert.equal((await request('removePersonalSite',{slot:3,previous:updated})).body.state.siteSlots[3],null);
  // Seed historical assignments directly so their approval/history regression coverage remains.
  // Public task-wheel requests are retired; production clients cannot call this test helper.
  function legacyAssignment(userId,requestId){

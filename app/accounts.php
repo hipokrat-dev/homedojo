@@ -50,9 +50,37 @@ function authorize_action(array $s,array $actor,string $action,array &$in): void
         $in['userId']=$actor['id'];
     }
 }
+function personal_sites(array $user): ?array {
+    if(($user['id']??'')!=='u3'||($user['memberType']??'')!=='child')return null;
+    return $user['siteSlots']??[
+        ['name'=>'Morpa Kampüs','url'=>'https://www.morpakampus.com/giris'],
+        ['name'=>'Okumanya','url'=>'https://oku.okumanya.com.tr/auth/login'],
+        ['name'=>'Kültür Okulları','url'=>'https://ogrenci.ozelbursakulturokullari.com/Kullanici/Giris'],
+        null,null,null
+    ];
+}
+function change_personal_site(array &$s,array $actor,string $action,array $in): void {
+    $i=active_user_index($s,$actor['id']);
+    $slots=personal_sites($s['users'][$i]);
+    if($slots===null)throw new AppError('Bu panel Aey hesabına ait.',403);
+    $slot=$in['slot']??null;
+    if(!is_int($slot)||$slot<0||$slot>=6)throw new AppError('Altı alandan birini seç.');
+    if(!array_key_exists('previous',$in)||$in['previous']!==$slots[$slot])throw new AppError('Bu site başka bir cihazda değişti. Paneli yeniden aç.',409);
+    if($action==='removePersonalSite')$slots[$slot]=null;
+    else {
+        $name=valid_text($in['name']??null,'Site adı',50);
+        $url=valid_text($in['url']??null,'Site adresi',2048);
+        if(!preg_match('~^[a-z][a-z0-9+.-]*:~i',$url))$url='https://'.$url;
+        $parts=parse_url($url);
+        if(strlen($url)>2048||!filter_var($url,FILTER_VALIDATE_URL)||strpbrk($url,"\\ \t\r\n")!==false||!in_array(strtolower($parts['scheme']??''),['http','https'],true)||empty($parts['host'])||!str_contains($parts['host'],'.')||isset($parts['user'])||isset($parts['pass']))throw new AppError('Geçerli bir web adresi gir. Örnek: okul.edu.tr');
+        $slots[$slot]=['name'=>$name,'url'=>$url];
+    }
+    $s['users'][$i]['siteSlots']=$slots;
+}
 function member_snapshot(array $s,array $actor): array {
     $v=snapshot($s);$v['conceptStudy']=concept_study_snapshot($actor);unset($v['shoppingRequests']);$v['shoppingFavorites']=($actor['memberType']??'')==='parent'?($s['shoppingFavorites']??shopping_default_favorites()):[];$v['shoppingItems']=($actor['memberType']??'')==='parent'?($s['shoppingItems']??[]):[];$allAssignments=$v['assignments'];$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];$v['personalNotes']=$actor['personalNotes']??[];$v['personalPlan']=$actor['personalPlan']??[];$v['footballEnabled']=football_enabled($actor);$v['footballVideos']=$v['footballEnabled']?($actor['footballVideos']??[]):[];
-    foreach($v['users'] as &$u){unset($u['conceptStudyMeta'],$u['conceptStudyV1'],$u['personalNotes'],$u['footballVideos'],$u['personalPlan'],$u['passwordHash'],$u['authVersion'],$u['routineHistory'],$u['routineTrackingSince'],$u['routineTrackingAt']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
+    if(($slots=personal_sites($actor))!==null)$v['siteSlots']=$slots;
+    foreach($v['users'] as &$u){unset($u['siteSlots'],$u['conceptStudyMeta'],$u['conceptStudyV1'],$u['personalNotes'],$u['footballVideos'],$u['personalPlan'],$u['passwordHash'],$u['authVersion'],$u['routineHistory'],$u['routineTrackingSince'],$u['routineTrackingAt']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
     $v['assignments']=array_values(array_filter($v['assignments'],fn($a)=>$a['userId']===$actor['id']||($a['reviewerId']??null)===$actor['id']));
     foreach(['completions','redemptions'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($a)=>$a['userId']===$actor['id']));
     if($actor['role']!=='admin')foreach(['tasks','rewards'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($r)=>$key==='tasks'?task_visible_to($r,$actor['id']):$r['ownerId']===$actor['id']));
