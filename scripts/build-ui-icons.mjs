@@ -2,7 +2,7 @@ import * as lucide from 'lucide';
 import {readFileSync,writeFileSync} from 'node:fs';
 
 // Ship only the glyphs we use, with no runtime CDN dependency.
-const names={bag:'ShoppingBag',home:'House',tasks:'ListChecks',wheel:'FerrisWheel',gift:'Gift',history:'History',settings:'Settings2',plus:'Plus',arrow:'ArrowRight',down:'ChevronDown',check:'Check',close:'X',edit:'SquarePen',trash:'Trash2',star:'Star',lock:'LockKeyhole',logout:'LogOut',spark:'Sparkles',palette:'Palette',sun:'Sun',moon:'Moon',system:'Monitor'};
+const names={bag:'ShoppingBag',home:'House',tasks:'ListChecks',book:'BookOpen',wheel:'FerrisWheel',gift:'Gift',history:'History',settings:'Settings2',plus:'Plus',arrow:'ArrowRight',down:'ChevronDown',check:'Check',close:'X',edit:'SquarePen',trash:'Trash2',star:'Star',lock:'LockKeyhole',logout:'LogOut',spark:'Sparkles',palette:'Palette',sun:'Sun',moon:'Moon',system:'Monitor'};
 const nodes=Object.fromEntries(Object.entries(names).map(([name,exportName])=>{
  if(!Array.isArray(lucide[exportName]))throw new Error(`Missing Lucide icon: ${exportName}`);
  return [name,lucide[exportName]];
