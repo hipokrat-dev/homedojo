@@ -67,3 +67,5 @@ Görevler, puanlar ve ödüller MySQL'de; üretim bağlantısı `public_html` d�
 - Kontrol: `node tests/families.mjs` aile ayrımını, Baba yetkisini, oturumları, çocuk yönetimini, mevcut verinin korunmasını ve eşzamanlı aile kodu seçimini test eder.
 
 Küçük çocuk profili kullanıcı adı ve şifre olmadan eklenebilir; bu durumda doğrudan giriş yapamaz ve ebeveyn panelinden takip edilir. Önceden giriş bilgisi olan küçük çocukların mevcut girişleri korunur. Büyük çocuk/ebeveyn hesaplarında giriş bilgileri gerekir; şifresiz profil büyük çocuğa dönüştürülürken yeni giriş bilgileri alınır.
+
+Aynı ailedeki tüm aktif ebeveynler çocukların günlük görevlerini ve başarı raporlarını görür. Bekleyen çocuk görevleri her ebeveynin Onaylar listesine gelir; seçilmiş ilk onaycı diğer ebeveynin onayını engellemez. Karar veren ebeveyn geçmişe yazılır ve ikinci onay tekrar puan vermez. Profil formunda tek takipçi seçilmez; geçmiş guardianId kayıtları ilk yönlendirme için korunur.

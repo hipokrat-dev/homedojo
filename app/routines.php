@@ -104,3 +104,19 @@ function parent_approve_assignment(array &$s,array $actor,array $in,?DateTimeImm
     $s['assignments'][$i]['reviewerId']=$p['id'];$s['assignments'][$i]['observedBy']=$p['id'];$s['assignments'][$i]['observedAt']=now_tr($now)->format(DateTimeInterface::ATOM);
     mutate($s,'reviewAssignment',['assignmentId'=>$a['id'],'actorId'=>$p['id'],'decision'=>'approve'],$now);
 }
+
+
+// All active parents in the scoped family can review a child's pending submission.
+function review_child_assignment(array &$s,array $actor,array $in,?DateTimeImmutable $now=null): void {
+    $parent=$s['users'][active_user_index($s,$actor['id'])];
+    if(($parent['memberType']??'')!=='parent')throw new AppError('Görevleri yalnızca ebeveyn onaylayabilir.',403);
+    $i=find_index($s['assignments'],$in['assignmentId']??null,'Görev');
+    $a=$s['assignments'][$i];
+    $child=$s['users'][active_user_index($s,$a['userId'],'Çocuk')];
+    if(has_daily_program($child)&&$a['status']!=='pending')throw new AppError('Bu görev zaten değerlendirildi. Sayfayı yenile.',409);
+    if(has_daily_program($child)&&$a['status']==='pending'){
+        $s['assignments'][$i]['originalReviewerId'] ??= $a['reviewerId']??null;
+        $s['assignments'][$i]['reviewerId']=$parent['id'];
+    }
+    mutate($s,'reviewAssignment',['assignmentId'=>$a['id'],'actorId'=>$parent['id'],'decision'=>$in['decision']??null],$now);
+}

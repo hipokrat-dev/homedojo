@@ -94,6 +94,7 @@ try{
         elseif($action==='restartConceptStudy')restart_concept_study($s,$actor,$input);
         elseif($action==='answerConceptCard')answer_concept_card($s,$actor,$input);
         elseif(in_array($action,['requestReward','reviewRewardRequest','cancelRewardRequest','deleteRewardRequest'],true))reward_wish($s,$actor,$action,$input);
+        elseif($action==='reviewAssignment')review_child_assignment($s,$actor,$input);
         elseif($action==='saveAccount')save_account($s,$input);
         elseif($action==='createAccount')create_account($s,$input);
         elseif($action==='archiveAccount')archive_account($s,$actor,$input);
