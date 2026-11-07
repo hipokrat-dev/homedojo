@@ -40,7 +40,7 @@ try{
             $store->clearLogin($ip);session_regenerate_id(true);$_SESSION['setupVerified']=true;$_SESSION['expires']=time()+1800;$_SESSION['csrf']=bin2hex(random_bytes(32));json_response(['csrf'=>$_SESSION['csrf'],'needsAccountSetup'=>true]);
         }
         $username=strtolower(is_string($input['username']??null)?$input['username']:'');$match=null;
-        foreach($current['users'] as $u)if(empty($u['archivedAt'])&&($u['username']??null)===$username)$match=$u;
+        foreach($current['users'] as $u)if(empty($u['archivedAt'])&&!empty($u['passwordHash'])&&($u['username']??null)===$username)$match=$u;
         $hash=$match['passwordHash']??'$2y$10$Yx43vCh2BlMS9T9oeQrxAeSwRYN0Wo83ZmGvrAMYBYlAyKnlCV6rO';
         if(!is_string($password)||strlen($password)>72||!password_verify($password,$hash)||!$match)throw new AppError('Kullanıcı adı veya şifre doğru değil.',422);
         $store->clearLogin($ip);session_regenerate_id(true);$_SESSION=['familyCode'=>$familyCode,'userId'=>$match['id'],'authVersion'=>$match['authVersion'],'expires'=>time()+86400,'csrf'=>bin2hex(random_bytes(32))];json_response(['csrf'=>$_SESSION['csrf']]);
@@ -61,7 +61,7 @@ try{
     if($action==='createFamily'){
         if($familyCode!==''||!can_create_families($current,$actor))throw new AppError('Yeni aileyi yalnızca site sahibi açabilir.',403);
         $family=new_family_state($input);$store->registerFamily($family);
-        json_response(['state'=>member_snapshot($current,$actor),'createdFamily'=>['code'=>$family['family']['code'],'name'=>$family['family']['name'],'username'=>$family['users'][0]['username']]]);
+        json_response(['state'=>member_snapshot($current,$actor),'createdFamily'=>['code'=>$family['family']['code'],'name'=>$family['family']['name'],'username'=>$family['users'][0]['username'],'usernames'=>array_column($family['users'],'username')]]);
     }
     if($action==='spin')throw new AppError('Görev çarkı kaldırıldı. Ebeveyninin atadığı görevleri Sayfam bölümünde takip edebilirsin.',410);
     if(in_array($action,['pushSubscribe','pushUnsubscribe','pushTest'],true)){

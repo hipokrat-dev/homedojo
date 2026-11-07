@@ -9,12 +9,16 @@ function new_family_state(array $in): array {
     $code=Store::familyCode($in['familyCode']??null);
     if($code==='')throw new AppError('Ailen için farklı bir aile kodu seç.');
     $name=valid_text($in['familyName']??null,'Aile adı',60);
-    $parent=valid_text($in['name']??null,'İsim',30);
-    $username=valid_username($in['username']??null);
+    $mother=valid_text($in['motherName']??'Anne','Anne adı',30);
+    $father=valid_text($in['fatherName']??'Baba','Baba adı',30);
     $password=account_password($in['password']??null);
     if($password!==($in['confirm']??null))throw new AppError('Şifre tekrarları eşleşmiyor.');
+    $parents=[];
+    foreach([['anne',$mother,'mother','🌷'],['baba',$father,'father','🌻']] as [$username,$parent,$parentRole,$avatar]){
+        $parents[]=['id'=>uid(),'name'=>$parent,'avatar'=>$avatar,'username'=>$username,'parentRole'=>$parentRole,'role'=>'admin','memberType'=>'parent','authVersion'=>1,'passwordHash'=>password_hash($password,PASSWORD_DEFAULT)];
+    }
     return upgrade_state(['version'=>9,'accountsEnabled'=>true,'family'=>['code'=>$code,'name'=>$name],
-        'users'=>[['id'=>uid(),'name'=>$parent,'avatar'=>'🏡','username'=>$username,'role'=>'admin','memberType'=>'parent','authVersion'=>1,'passwordHash'=>password_hash($password,PASSWORD_DEFAULT)]],
+        'users'=>$parents,
         'tasks'=>[],'rewards'=>[],'assignments'=>[],'completions'=>[],'redemptions'=>[],'competitions'=>[],'rewardWishes'=>[]]);
 }
 function accounts_ready(array $s): bool { return !empty($s['accountsEnabled']); }
@@ -41,7 +45,7 @@ function setup_accounts(array &$s,array $in): void {
 }
 function actor_for(array $s,array $session): ?array {
     if(!accounts_ready($s)||($session['expires']??0)<=time())return null;
-    foreach($s['users'] as $u)if(empty($u['archivedAt'])&&$u['id']===($session['userId']??null)&&($u['authVersion']??1)===($session['authVersion']??0))return $u;
+    foreach($s['users'] as $u)if(empty($u['archivedAt'])&&!empty($u['passwordHash'])&&$u['id']===($session['userId']??null)&&($u['authVersion']??1)===($session['authVersion']??0))return $u;
     return null;
 }
 function authorize_action(array $s,array $actor,string $action,array &$in): void {
@@ -95,7 +99,7 @@ function change_personal_site(array &$s,array $actor,string $action,array $in): 
 function member_snapshot(array $s,array $actor): array {
     $v=snapshot($s);$v['canCreateFamilies']=can_create_families($s,$actor);$v['family']=$s['family']??['code'=>'bizim-ev','name'=>'Bizim Evimiz'];$v['conceptStudy']=concept_study_snapshot($actor);unset($v['shoppingRequests']);$v['shoppingFavorites']=($actor['memberType']??'')==='parent'?($s['shoppingFavorites']??shopping_default_favorites()):[];$v['shoppingItems']=($actor['memberType']??'')==='parent'?($s['shoppingItems']??[]):[];$allAssignments=$v['assignments'];$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];$v['personalNotes']=$actor['personalNotes']??[];$v['personalPlan']=$actor['personalPlan']??[];$v['footballEnabled']=football_enabled($actor);$v['footballVideos']=$v['footballEnabled']?($actor['footballVideos']??[]):[];
     if(($slots=personal_sites($actor))!==null)$v['siteSlots']=$slots;
-    foreach($v['users'] as &$u){unset($u['siteSlots'],$u['conceptStudyMeta'],$u['conceptStudyV1'],$u['personalNotes'],$u['footballVideos'],$u['personalPlan'],$u['passwordHash'],$u['authVersion'],$u['routineHistory'],$u['routineTrackingSince'],$u['routineTrackingAt']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
+    foreach($v['users'] as &$u){$u['hasLogin']=!empty($u['passwordHash']);unset($u['siteSlots'],$u['conceptStudyMeta'],$u['conceptStudyV1'],$u['personalNotes'],$u['footballVideos'],$u['personalPlan'],$u['passwordHash'],$u['authVersion'],$u['routineHistory'],$u['routineTrackingSince'],$u['routineTrackingAt']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
     $v['assignments']=array_values(array_filter($v['assignments'],fn($a)=>$a['userId']===$actor['id']||($a['reviewerId']??null)===$actor['id']));
     foreach(['completions','redemptions'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($a)=>$a['userId']===$actor['id']));
     if($actor['role']!=='admin')foreach(['tasks','rewards'] as $key)$v[$key]=array_values(array_filter($v[$key],fn($r)=>$key==='tasks'?task_visible_to($r,$actor['id']):$r['ownerId']===$actor['id']));
@@ -125,10 +129,13 @@ function member_snapshot(array $s,array $actor): array {
     return $v;
 }
 function save_account(array &$s,array $in): void {
-    $i=active_user_index($s,$in['id']??null);$old=$s['users'][$i];$username=valid_username($in['username']??null);
-    foreach($s['users'] as $j=>$u)if($j!==$i&&($u['username']??'')===$username)throw new AppError('Bu kullanıcı adı kullanılıyor.');
+    $i=active_user_index($s,$in['id']??null);$old=$s['users'][$i];
     $type=$in['memberType']??$old['memberType']??'child';
     if(!in_array($type,['parent','child','young_child'],true))throw new AppError('Kullanıcı türü geçersiz.');
+    $wantsLogin=$type!=='young_child'||!empty($in['username'])||!empty($in['password']);
+    $username=$wantsLogin?valid_username($in['username']??$old['username']??null):($old['username']??'');
+    if($username!=='')foreach($s['users'] as $j=>$u)if($j!==$i&&($u['username']??'')===$username)throw new AppError('Bu kullanıcı adı kullanılıyor.');
+    if($wantsLogin&&empty($old['passwordHash']))account_password($in['password']??null);
     if(($old['role']??'')==='admin'&&$type!=='parent')throw new AppError('Admin hesabı ebeveyn olarak kalmalı.');
     if($type!=='parent')foreach($s['users'] as $u)if(empty($u['archivedAt'])&&($u['guardianId']??'')===$old['id'])throw new AppError('Önce bu ebeveyne bağlı çocukların onaycısını değiştir.');
     $updated=array_merge($old,['username'=>$username,'name'=>valid_text($in['name']??null,'İsim',30),'avatar'=>valid_text($in['avatar']??null,'Simge',12),'memberType'=>$type]);
@@ -153,7 +160,7 @@ function save_account(array &$s,array $in): void {
 function create_account(array &$s,array $in): void {
     if(count($s['users'])>=100)throw new AppError('En fazla 100 kullanıcı kaydı tutulabilir.');
     $id=uid();$candidate=$s;$candidate['users'][]=['id'=>$id,'name'=>'Yeni üye','avatar'=>'🌟','username'=>'','role'=>'member','authVersion'=>1,'memberType'=>'child'];
-    $in['id']=$id;account_password($in['password']??null);save_account($candidate,$in);$s=$candidate;
+    $in['id']=$id;save_account($candidate,$in);$s=$candidate;
 }
 function archive_account(array &$s,array $actor,array $in): void {
     $i=active_user_index($s,$in['id']??null);$u=$s['users'][$i];
