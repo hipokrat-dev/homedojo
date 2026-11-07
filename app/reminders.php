@@ -29,10 +29,13 @@ if(realpath($_SERVER['SCRIPT_FILENAME']??'')===__FILE__){
     if(!$lock||!flock($lock,LOCK_EX|LOCK_NB))exit(0);
     try{
         $store=new Store(configuration());$push=new TaskPush($store->db);$sent=0;$failed=0;$start=time();
-        foreach(due_plan_reminders($store->read(),time()) as $item){
-            if(time()-$start>45)break;
-            $result=$push->deliver($item['user'],$item['event'],null,300);
-            $sent+=$result['sent'];$failed+=$result['failed'];
+        foreach(array_merge([''],$store->familyCodes()) as $code){
+            $store->selectFamily($code);
+            foreach(due_plan_reminders($store->read(),time()) as $item){
+                if(time()-$start>45)break 2;
+                $result=$push->deliver($item['user'],$item['event'],null,300);
+                $sent+=$result['sent'];$failed+=$result['failed'];
+            }
         }
         echo gmdate('c')." reminders sent=$sent failed=$failed\n";
         exit($failed?1:0);

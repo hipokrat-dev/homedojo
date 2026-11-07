@@ -10,7 +10,7 @@ try{
     $config=configuration();session_start_safe();$action=$_GET['action']??'state';$method=$_SERVER['REQUEST_METHOD'];
     $development=($config['environment']??'production')==='development';
     if(!$development&&empty($config['password_hash']))throw new RuntimeException('Password is required in production.');
-    $writes=['savePersonalSite','removePersonalSite','restartConceptStudy','answerConceptCard','addShoppingProduct','saveShoppingFavorite','saveShoppingItem','setShoppingDone','deleteShoppingItem','saveNote','deleteNote','saveFootballVideo','deleteFootballVideo','savePlan','deletePlan','togglePlan','pushSubscribe','pushUnsubscribe','pushTest','deleteRewardRequest','saveGames','parentAssignTask','parentApproveAssignment','parentApproveRoutine','requestReward','reviewRewardRequest','cancelRewardRequest','login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem','cancelAssignment','createCompetition','cancelCompetition','claimCompetition','setupAccounts','saveAccount','reviewAssignment','savePhoto','changeCredentials','createAccount','archiveAccount','restoreAccount','saveRoutines','completeRoutine'];
+    $writes=['createFamily','savePersonalSite','removePersonalSite','restartConceptStudy','answerConceptCard','addShoppingProduct','saveShoppingFavorite','saveShoppingItem','setShoppingDone','deleteShoppingItem','saveNote','deleteNote','saveFootballVideo','deleteFootballVideo','savePlan','deletePlan','togglePlan','pushSubscribe','pushUnsubscribe','pushTest','deleteRewardRequest','saveGames','parentAssignTask','parentApproveAssignment','parentApproveRoutine','requestReward','reviewRewardRequest','cancelRewardRequest','login','logout','spin','saveTask','deleteTask','saveReward','deleteReward','saveUser','selectGoal','complete','redeem','cancelAssignment','createCompetition','cancelCompetition','claimCompetition','setupAccounts','saveAccount','reviewAssignment','savePhoto','changeCredentials','createAccount','archiveAccount','restoreAccount','saveRoutines','completeRoutine'];
     if(in_array($action,$writes,true)){
         if($method!=='POST')throw new AppError('Bu işlem POST gerektirir.',405);
         if(($_SERVER['HTTP_SEC_FETCH_SITE']??'')==='cross-site')throw new AppError('Bu kaynaktan işlem yapılamaz.',403);
@@ -25,11 +25,16 @@ try{
         if(!is_array($input))throw new AppError('Geçersiz istek.');
     }elseif($method!=='GET')throw new AppError('Yöntem desteklenmiyor.',405);
     $store=new Store($config);if($development)$store->initialize();
+    if($action==='login'){
+        $store->attemptLogin($_SERVER['REMOTE_ADDR']??'unknown');
+        $familyCode=Store::familyCode($input['familyCode']??'');
+    }else $familyCode=Store::familyCode($_SESSION['familyCode']??'');
+    $store->selectFamily($familyCode);
     $current=$store->read();$ready=accounts_ready($current);$actor=actor_for($current,$_SESSION);
     if($action==='session')json_response(['authenticated'=>$actor!==null,'needsAccountSetup'=>!$ready,'photoUploadEnabled'=>function_exists('imagecreatefromstring'),'csrf'=>$_SESSION['csrf']]);
     if($action==='logout'){if($actor&&!empty($_SESSION['pushDevice'])){try{(new TaskPush($store->db))->remove($_SESSION['pushDevice'],$actor['id']);}catch(Throwable $e){error_log('Push logout cleanup failed');}}$_SESSION=[];session_destroy();setcookie(session_name(),'', ['expires'=>1,'path'=>'/','secure'=>!$development,'httponly'=>true,'samesite'=>'Strict']);json_response(['ok'=>true]);}
     if($action==='login'){
-        $ip=$_SERVER['REMOTE_ADDR']??'unknown';$store->attemptLogin($ip);$password=$input['password']??'';
+        $ip=$_SERVER['REMOTE_ADDR']??'unknown';$password=$input['password']??'';
         if(!$ready){
             if(!is_string($password)||strlen($password)>1024||!password_verify($password,$config['password_hash']))throw new AppError('Ev şifresi doğru değil.',422);
             $store->clearLogin($ip);session_regenerate_id(true);$_SESSION['setupVerified']=true;$_SESSION['expires']=time()+1800;$_SESSION['csrf']=bin2hex(random_bytes(32));json_response(['csrf'=>$_SESSION['csrf'],'needsAccountSetup'=>true]);
@@ -38,7 +43,7 @@ try{
         foreach($current['users'] as $u)if(empty($u['archivedAt'])&&($u['username']??null)===$username)$match=$u;
         $hash=$match['passwordHash']??'$2y$10$Yx43vCh2BlMS9T9oeQrxAeSwRYN0Wo83ZmGvrAMYBYlAyKnlCV6rO';
         if(!is_string($password)||strlen($password)>72||!password_verify($password,$hash)||!$match)throw new AppError('Kullanıcı adı veya şifre doğru değil.',422);
-        $store->clearLogin($ip);session_regenerate_id(true);$_SESSION=['userId'=>$match['id'],'authVersion'=>$match['authVersion'],'expires'=>time()+86400,'csrf'=>bin2hex(random_bytes(32))];json_response(['csrf'=>$_SESSION['csrf']]);
+        $store->clearLogin($ip);session_regenerate_id(true);$_SESSION=['familyCode'=>$familyCode,'userId'=>$match['id'],'authVersion'=>$match['authVersion'],'expires'=>time()+86400,'csrf'=>bin2hex(random_bytes(32))];json_response(['csrf'=>$_SESSION['csrf']]);
     }
     if(!$ready){
         $setupSession=($development&&empty($config['password_hash']))||(!empty($_SESSION['setupVerified'])||!empty($_SESSION['authenticated']))&&($_SESSION['expires']??0)>time();
@@ -53,6 +58,11 @@ try{
     if($action==='setupAccounts')throw new AppError('Kişisel hesaplar zaten oluşturuldu.',409);
     if($action==='pushKey'){if(!function_exists('curl_init')||!function_exists('openssl_pkey_new'))throw new AppError('Sunucuda bildirim desteği kullanılamıyor.',503);json_response(['publicKey'=>(new TaskPush($store->db))->keys()['public_key']]);}
     if(!$actor)throw new AppError('Kendi kullanıcı adın ve şifrenle giriş yap.',401);
+    if($action==='createFamily'){
+        if($familyCode!==''||!can_create_families($current,$actor))throw new AppError('Yeni aileyi yalnızca site sahibi açabilir.',403);
+        $family=new_family_state($input);$store->registerFamily($family);
+        json_response(['state'=>member_snapshot($current,$actor),'createdFamily'=>['code'=>$family['family']['code'],'name'=>$family['family']['name'],'username'=>$family['users'][0]['username']]]);
+    }
     if($action==='spin')throw new AppError('Görev çarkı kaldırıldı. Ebeveyninin atadığı görevleri Sayfam bölümünde takip edebilirsin.',410);
     if(in_array($action,['pushSubscribe','pushUnsubscribe','pushTest'],true)){
         $push=new TaskPush($store->db);
@@ -64,7 +74,7 @@ try{
         $limitKey='credentials:'.$actor['id'].':'.($_SERVER['REMOTE_ADDR']??'unknown');$store->attemptLogin($limitKey);
         $current=$store->update(function(array &$s)use($input){$actor=actor_for($s,$_SESSION);if(!$actor)throw new AppError('Oturum sona erdi.',401);change_credentials($s,$actor,$input);});
         $updated=$current['users'][find_index($current['users'],$actor['id'],'Kullanıcı')];
-        $store->clearLogin($limitKey);session_regenerate_id(true);$_SESSION=['userId'=>$updated['id'],'authVersion'=>$updated['authVersion'],'expires'=>time()+86400,'csrf'=>bin2hex(random_bytes(32))];
+        $store->clearLogin($limitKey);session_regenerate_id(true);$_SESSION=['familyCode'=>$familyCode,'userId'=>$updated['id'],'authVersion'=>$updated['authVersion'],'expires'=>time()+86400,'csrf'=>bin2hex(random_bytes(32))];
         json_response(['state'=>member_snapshot($current,$updated),'csrf'=>$_SESSION['csrf']]);
     }
     $session=$_SESSION;$csrf=$_SESSION['csrf'];session_write_close();

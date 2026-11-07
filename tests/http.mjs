@@ -300,3 +300,6 @@ try{
  assert.equal((await request('logout',{})).status,200);assert.equal((await request('state')).status,401);
  console.log('✓ HTTP personal login, migration, roles, ownership, privacy, CSRF, session rotation/revocation, concurrent draws/submissions/approvals, frozen points, reward debit and family scoring passed.');
 }finally{if(server&&server.exitCode===null&&server.signalCode===null){const exited=new Promise(r=>server.once('exit',r));server.kill();await exited;}await rm(dir,{recursive:true,force:true});}
+
+// Keep multi-family isolation checks in the existing CI entry point.
+await import('./families.mjs');

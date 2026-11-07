@@ -2,6 +2,21 @@
 declare(strict_types=1);
 require_once __DIR__.'/football.php';
 require_once __DIR__.'/study.php';
+function can_create_families(array $s,array $actor): bool {
+    return !isset($s['family'])&&($actor['id']??'')==='u1'&&($actor['role']??'')==='admin'&&($actor['memberType']??'')==='parent';
+}
+function new_family_state(array $in): array {
+    $code=Store::familyCode($in['familyCode']??null);
+    if($code==='')throw new AppError('Ailen için farklı bir aile kodu seç.');
+    $name=valid_text($in['familyName']??null,'Aile adı',60);
+    $parent=valid_text($in['name']??null,'İsim',30);
+    $username=valid_username($in['username']??null);
+    $password=account_password($in['password']??null);
+    if($password!==($in['confirm']??null))throw new AppError('Şifre tekrarları eşleşmiyor.');
+    return upgrade_state(['version'=>9,'accountsEnabled'=>true,'family'=>['code'=>$code,'name'=>$name],
+        'users'=>[['id'=>uid(),'name'=>$parent,'avatar'=>'🏡','username'=>$username,'role'=>'admin','memberType'=>'parent','authVersion'=>1,'passwordHash'=>password_hash($password,PASSWORD_DEFAULT)]],
+        'tasks'=>[],'rewards'=>[],'assignments'=>[],'completions'=>[],'redemptions'=>[],'competitions'=>[],'rewardWishes'=>[]]);
+}
 function accounts_ready(array $s): bool { return !empty($s['accountsEnabled']); }
 function valid_username(mixed $v): string {
     if(!is_string($v)||!preg_match('/^[a-zA-Z0-9._-]{3,32}$/',$v))throw new AppError('Kullanıcı adı 3–32 harf, rakam, nokta veya alt çizgi olmalı.');
@@ -78,7 +93,7 @@ function change_personal_site(array &$s,array $actor,string $action,array $in): 
     $s['users'][$i]['siteSlots']=$slots;
 }
 function member_snapshot(array $s,array $actor): array {
-    $v=snapshot($s);$v['conceptStudy']=concept_study_snapshot($actor);unset($v['shoppingRequests']);$v['shoppingFavorites']=($actor['memberType']??'')==='parent'?($s['shoppingFavorites']??shopping_default_favorites()):[];$v['shoppingItems']=($actor['memberType']??'')==='parent'?($s['shoppingItems']??[]):[];$allAssignments=$v['assignments'];$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];$v['personalNotes']=$actor['personalNotes']??[];$v['personalPlan']=$actor['personalPlan']??[];$v['footballEnabled']=football_enabled($actor);$v['footballVideos']=$v['footballEnabled']?($actor['footballVideos']??[]):[];
+    $v=snapshot($s);$v['canCreateFamilies']=can_create_families($s,$actor);$v['family']=$s['family']??['code'=>'bizim-ev','name'=>'Bizim Evimiz'];$v['conceptStudy']=concept_study_snapshot($actor);unset($v['shoppingRequests']);$v['shoppingFavorites']=($actor['memberType']??'')==='parent'?($s['shoppingFavorites']??shopping_default_favorites()):[];$v['shoppingItems']=($actor['memberType']??'')==='parent'?($s['shoppingItems']??[]):[];$allAssignments=$v['assignments'];$v['viewerId']=$actor['id'];$v['viewerRole']=$actor['role'];$v['personalNotes']=$actor['personalNotes']??[];$v['personalPlan']=$actor['personalPlan']??[];$v['footballEnabled']=football_enabled($actor);$v['footballVideos']=$v['footballEnabled']?($actor['footballVideos']??[]):[];
     if(($slots=personal_sites($actor))!==null)$v['siteSlots']=$slots;
     foreach($v['users'] as &$u){unset($u['siteSlots'],$u['conceptStudyMeta'],$u['conceptStudyV1'],$u['personalNotes'],$u['footballVideos'],$u['personalPlan'],$u['passwordHash'],$u['authVersion'],$u['routineHistory'],$u['routineTrackingSince'],$u['routineTrackingAt']);if($u['id']!==$actor['id']){unset($u['goalRewardId'],$u['goalSelectedAt'],$u['goal'],$u['doneIds'],$u['eligibleTaskIds']);if($actor['role']!=='admin')unset($u['username']);}}unset($u);
     $v['assignments']=array_values(array_filter($v['assignments'],fn($a)=>$a['userId']===$actor['id']||($a['reviewerId']??null)===$actor['id']));

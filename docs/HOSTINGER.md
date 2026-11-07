@@ -54,3 +54,14 @@ GitHub Actions testleri ayrı çalışır; Hostinger'ın doğrudan otomatik dağ
 HTML, CSS ve JavaScript yanıtları `Cache-Control: no-cache` ile tekrar doğrulanır; yeni dağıtımdan sonra sayfa yenilendiğinde dosyaların güncel sürümü istenir. Zaten açık bir sayfa kendiliğinden yenilenmez.
 
 Görevler, puanlar ve ödüller MySQL'de; üretim bağlantısı `public_html` dışında `homedojo-private/config.local.php` içindedir. Kaynak dağıtımı bunları sıfırlamaz. Kurulum işlemi yalnızca ilk açılışta yapılır; güncellemelerde yeniden kurulum veya seed/reset çalıştırmayın.
+
+## Ayrı aile hesapları
+
+- Yeni aileyi yalnızca mevcut ailenin Baba (`u1`) admin hesabı, Çocuklar → Yönet → Görev ve kişi ayarları → Yeni aile oluştur yolundan açabilir. Diğer aile yöneticileri ve anonim ziyaretçiler aile açamaz.
+- Aile adı, benzersiz aile kodu ve ilk ebeveynin giriş bilgileri belirlenir. Ebeveyn kendi ailesinin adminidir; çocuk hesaplarını kendisi ekler. Açma işlemi site sahibinin oturumunu değiştirmez.
+- Yeni aileler girişte aile kodu + kullanıcı adı + şifre kullanır. Mevcut aile boş aile koduyla veya `bizim-ev` koduyla giriş yapmaya devam eder. Aile kodu bir şifre değildir.
+- Mevcut veri `homedojo_state` satırında korunur. Yeni ailelerin her biri `homedojo_families` tablosunda ayrı JSON kaydına sahiptir. Yeni tablo ilk kullanımda oluşturulur; eski veriyi taşımak veya yeniden seed etmek gerekmez. Veritabanı yedeklerine bu tablo da dahil edilmelidir.
+- Doğrulanmış aile kodu sunucu oturumuna bağlanır. Sonraki okuma/yazma istekleri aileyi sorgu veya gövde parametresinden seçemez. Her ailede kullanıcı adları bağımsızdır; yeni kullanıcı kimlikleri rastgele ve global benzersizdir.
+- Saatli bildirim işi bütün aileleri dolaşır. Bildirim abonelikleri benzersiz kullanıcı kimliği ve yetki sürümü ile eşleşir.
+- Yayın sırası: `app/store.php`, `app/accounts.php`, `app/reminders.php`, `public/api.php`, ardından `public/app.js`. Yeni aile açıldıktan sonra bu tablonun farkında olmayan eski API sürümüyle çalıştırılmamalıdır.
+- Kontrol: `node tests/families.mjs` aile ayrımını, Baba yetkisini, oturumları, çocuk yönetimini, mevcut verinin korunmasını ve eşzamanlı aile kodu seçimini test eder.
